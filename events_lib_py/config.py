@@ -34,11 +34,7 @@ def import_from_string(path: str):
     """
     Attempt to import from a string representation.
     """
-    try:
-        return import_string(path)
-    except ImportError:
-        raise
-        # raise ImportError(f"Could not import '{path}'")
+    return import_string(path)
 
 
 def load_consumer_config() -> dict:

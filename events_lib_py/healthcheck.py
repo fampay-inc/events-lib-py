@@ -2,12 +2,18 @@ import logging
 from socketserver import ThreadingMixIn
 from threading import Thread
 from typing import Optional
-from wsgiref.simple_server import WSGIServer, make_server
+from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 LOGGER = logging.getLogger(__name__)
 
 
 class HealthCheckServer(Thread):
+    class SilentHandler(WSGIRequestHandler):
+        """WSGI handler that does not log requests."""
+
+        def log_message(self, format, *args):
+            """Log nothing."""
+
     class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
         """Thread per request HTTP server."""
 
@@ -22,7 +28,11 @@ class HealthCheckServer(Thread):
         self._is_healthy: bool = False
         self._port: int = port
         self._server: Optional[WSGIServer] = make_server(
-            "0.0.0.0", self._port, self._application, self.ThreadingWSGIServer
+            "0.0.0.0",
+            self._port,
+            self._application,
+            self.ThreadingWSGIServer,
+            handler_class=self.SilentHandler,
         )
 
     def _application(self, environ, start_response):
