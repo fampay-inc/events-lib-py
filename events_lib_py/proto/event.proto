@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+message Event {
+    string name = 2;
+    bytes payload = 3;
+    int32 retry_count = 4;
+    optional string valid_till = 5;
+}
