@@ -6,7 +6,7 @@ from confluent_kafka import Message
 
 from .config import IS_TEST_ENV, PRODUCER_CONFIG
 from .consumer import KafkaConsumer, KafkaConsumerConfig
-from .dataclasses import Configuration, EventHandlerResponse
+from .dataclasses import EventHandlerResponse
 from .healthcheck import HealthCheckServer
 from .metrics import (
     KAFKA_MESSAGE_QUEUED_TOTAL,
@@ -16,7 +16,6 @@ from .pb.event_pb2 import Event
 from .producer import FakeKafkaProducer, KafkaProducer, KafkaProducerConfig
 
 __all__ = (
-    "Configuration",
     "EventHandlerResponse",
     "HealthCheckServer",
     "KafkaConsumer",

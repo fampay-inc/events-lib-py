@@ -37,7 +37,7 @@ class Command(BaseCommand):
         parser.add_argument("--retry-topic", type=str, required=True)
         parser.add_argument("--dlq-topic", type=str, required=True)
 
-    def _build_consumer_config(kwargs: dict) -> KafkaConsumerConfig:
+    def _build_consumer_config(self, kwargs: dict) -> KafkaConsumerConfig:
         group_id, topics, retry_topic, dlq_topic = (
             kwargs["group_id"],
             kwargs["topics"],
