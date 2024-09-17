@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-Django = "2.2.5"
+Django = "*"
 confluent-kafka = "^2.5.3"
 gevent = "^24.2.1"
 prometheus-client = ">=0.7"
