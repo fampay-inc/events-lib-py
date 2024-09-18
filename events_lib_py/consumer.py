@@ -215,7 +215,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
                         msg.partition(),
                     )
                 else:
-                    self.exception_handler(err)
+                    self.exception_handler(Exception(err))
                 continue
             to_be_processed_messages.append(msg)
 
