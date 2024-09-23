@@ -36,6 +36,9 @@ class Command(BaseCommand):
         parser.add_argument("--topics", type=str, required=True, nargs="+")
         parser.add_argument("--retry-topic", type=str, required=True)
         parser.add_argument("--dlq-topic", type=str, required=True)
+        parser.add_argument(
+            "--healthcheck-port", type=int, required=False, default=None
+        )
 
     def _build_consumer_config(self, kwargs: dict) -> KafkaConsumerConfig:
         group_id, topics, retry_topic, dlq_topic = (
@@ -68,16 +71,16 @@ class Command(BaseCommand):
         if hook := config.PRE_INIT_HOOK:
             hook()
 
-        consumer = consumer = KafkaConsumer(config=self._build_consumer_config(kwargs))
-        healthcheck = HealthCheckServer(port=config.HEALTHCHECK_PORT)
+        consumer = KafkaConsumer(config=self._build_consumer_config(kwargs))
+        healthcheck = HealthCheckServer(
+            port=kwargs.get("healthcheck_port") or config.HEALTHCHECK_PORT,
+            is_healthy=consumer.is_healthy,
+        )
 
         self._register_signal_handlers(consumer=consumer, healthcheck=healthcheck)
 
         healthcheck.start()
-        consumer.start(
-            healthy_handler=healthcheck.healthy,
-            unhealthy_handler=healthcheck.unhealthy,
-        )
+        consumer.start()
 
         # Main thread will stay blocked until consumer loop finishes
         consumer.join()

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from threading import Thread
 from typing import Callable, Optional
 
-from confluent_kafka import Consumer, KafkaError, Message
+from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
 from .dataclasses import EventHandlerResponse
@@ -182,11 +182,9 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         self._consumer.subscribe(config.topics)
         self._pool = Pool(size=config.batch_size)
         self._keep_running = True
+        self._committed_offsets: "dict[tuple, int]" = {}
 
         self.exception_handler = config.generic_exception_handler
-
-        self.healthy: Callable
-        self.unhealthy: Callable
 
     def shutdown(self):
         LOGGER.info("msg=%s", "Stopping consumer loop")
@@ -198,6 +196,52 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         LOGGER.info(
             "msg=%s topics=%s", "Connected to broker", ", ".join(metadata.topics.keys())
         )
+
+    def _generate_offset_maps(self) -> "tuple[dict, dict]":
+        assignments: "list[TopicPartition]" = self._consumer.assignment()
+
+        latest_offsets, committed_offsets = {}, {}
+        for tp in assignments:
+            key = (tp.topic, tp.partition)
+            committed_offsets[key] = tp.offset
+
+            _, high = self._consumer.get_watermark_offsets(tp)
+            latest_offsets[key] = high - 1
+
+        return latest_offsets, committed_offsets
+
+    def is_healthy(self) -> bool:
+        latest_offsets, committed_offsets = self._generate_offset_maps()
+        if not self._committed_offsets:
+            self._committed_offsets = committed_offsets
+            return False
+
+        healthy = True
+        for key in committed_offsets.keys():
+            (
+                prev_committed_offset,
+                current_committed_offset,
+                current_latest_offset,
+            ) = (
+                self._committed_offsets.get(key),
+                committed_offsets[key],
+                latest_offsets[key],
+            )
+
+            if not prev_committed_offset:
+                # Consumer has been reassigned a new partition due to rebalancing
+                healthy = False
+                break
+
+            if current_committed_offset == current_latest_offset:
+                continue
+
+            if current_committed_offset == prev_committed_offset:
+                healthy = False
+                break
+
+        self._committed_offsets = committed_offsets
+        return healthy
 
     @KAFKA_CONSUMER_BATCH_FETCH_LATENCY.time()
     def _fetch_batch(self) -> "list[Message]":
@@ -238,21 +282,12 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
             )
             self.exception_handler(e)
 
-    def start(self, healthy_handler: Callable, unhealthy_handler: Callable):
-        self.healthy = healthy_handler
-        self.unhealthy = unhealthy_handler
-        super().start()
-
     def run(self):
         LOGGER.info("msg=%s", "Starting consumer loop")
-        informed_health = False
+
         try:
             while self._keep_running:
                 batch = self._fetch_batch()
-
-                if not informed_health:
-                    self.healthy()
-                    informed_health = True
 
                 if not batch:
                     time.sleep(0.1)
@@ -263,6 +298,5 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
             LOGGER.error(e, exc_info=True)
             self.exception_handler(e)
 
-        self.unhealthy()
         self._consumer.close()
         LOGGER.info("msg=%s", "Consumer loop stopped")

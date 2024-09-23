@@ -1,7 +1,7 @@
 import logging
 from socketserver import ThreadingMixIn
 from threading import Thread
-from typing import Optional
+from typing import Callable, Optional
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 LOGGER = logging.getLogger(__name__)
@@ -22,10 +22,10 @@ class HealthCheckServer(Thread):
         # non-daemon threads in a list in order to join on them at server close.
         daemon_threads = True
 
-    def __init__(self, port: int):
+    def __init__(self, port: int, is_healthy: Callable[[], bool]):
         super().__init__()
 
-        self._is_healthy: bool = False
+        self._is_healthy = is_healthy
         self._port: int = port
         self._server: Optional[WSGIServer] = make_server(
             "0.0.0.0",
@@ -45,7 +45,7 @@ class HealthCheckServer(Thread):
 
             response = (
                 '{"status": "healthy"}'
-                if self._is_healthy
+                if self._is_healthy()
                 else '{"status": "unhealthy"}'
             )
             return [response.encode("utf-8")]
@@ -55,15 +55,6 @@ class HealthCheckServer(Thread):
         headers = [("Content-type", "text/plain")]
         start_response(status, headers)
         return [b"Not Found"]
-
-    def _update_health_status(self, is_healthy: bool) -> None:
-        self._is_healthy = is_healthy
-
-    def healthy(self):
-        self._update_health_status(is_healthy=True)
-
-    def unhealthy(self):
-        self._update_health_status(is_healthy=False)
 
     def run(self):
         LOGGER.info("msg=%s port=%s", "Serving health check", self._port)
