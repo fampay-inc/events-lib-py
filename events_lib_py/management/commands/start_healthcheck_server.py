@@ -97,7 +97,7 @@ class Command(BaseCommand):
         )
 
     def add_arguments(self, parser: CommandParser) -> None:
-        parser.add_argument("--consumer-group-id", type=int, required=True)
+        parser.add_argument("--consumer-group-id", type=str, required=True)
         parser.add_argument("--port", type=int, required=False, default=9200)
 
     def handle(self, *args, **kwargs):
