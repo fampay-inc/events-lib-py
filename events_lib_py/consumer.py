@@ -7,6 +7,8 @@ from typing import Callable, Optional
 from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
+from events_lib_py.healthcheck import HealthCheckUtil
+
 from .dataclasses import EventHandlerResponse
 from .metrics import (
     KAFKA_CONSUMER_BATCH_FETCH_LATENCY,
@@ -182,7 +184,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         self._consumer.subscribe(config.topics)
         self._pool = Pool(size=config.batch_size)
         self._keep_running = True
-        self._committed_offsets: "dict[tuple, int]" = {}
+        self._prev_committed_offsets: "dict[tuple, int]" = {}
 
         self.exception_handler = config.generic_exception_handler
 
@@ -213,35 +215,12 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     def is_healthy(self) -> bool:
         latest_offsets, committed_offsets = self._generate_offset_maps()
-        if not self._committed_offsets:
-            self._committed_offsets = committed_offsets
-            return False
-
-        healthy = True
-        for key in committed_offsets.keys():
-            (
-                prev_committed_offset,
-                current_committed_offset,
-                current_latest_offset,
-            ) = (
-                self._committed_offsets.get(key),
-                committed_offsets[key],
-                latest_offsets[key],
-            )
-
-            if not prev_committed_offset:
-                # Consumer has been reassigned a new partition due to rebalancing
-                healthy = False
-                break
-
-            if current_committed_offset == current_latest_offset:
-                continue
-
-            if current_committed_offset == prev_committed_offset:
-                healthy = False
-                break
-
-        self._committed_offsets = committed_offsets
+        healthy = HealthCheckUtil.is_consumer_healthy(
+            prev_committed_offsets=self._prev_committed_offsets,
+            latest_offsets=latest_offsets,
+            committed_offsets=committed_offsets,
+        )
+        self._prev_committed_offsets = committed_offsets
         return healthy
 
     @KAFKA_CONSUMER_BATCH_FETCH_LATENCY.time()

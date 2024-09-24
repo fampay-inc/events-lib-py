@@ -1,38 +1,62 @@
 import logging
-from socketserver import ThreadingMixIn
 from threading import Thread
-from typing import Callable, Optional
-from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
+from typing import Callable
+from wsgiref.simple_server import WSGIServer, make_server
+
+from events_lib_py.server import SilentHandler, ThreadingWSGIServer
 
 LOGGER = logging.getLogger(__name__)
 
 
+class HealthCheckUtil:
+    @staticmethod
+    def is_consumer_healthy(
+        prev_committed_offsets: "dict[tuple[str, int], int]",
+        latest_offsets: "dict[tuple[str, int], int]",
+        committed_offsets: "dict[tuple[str, int], int]",
+    ):
+        if not prev_committed_offsets:
+            return False
+
+        healthy = True
+        for key in committed_offsets.keys():
+            (
+                prev_committed_offset,
+                current_committed_offset,
+                current_latest_offset,
+            ) = (
+                prev_committed_offsets.get(key),
+                committed_offsets[key],
+                latest_offsets[key],
+            )
+
+            if not prev_committed_offset:
+                # Consumer has been reassigned a new partition due to rebalancing
+                healthy = False
+                break
+
+            if current_committed_offset == current_latest_offset:
+                continue
+
+            if current_committed_offset == prev_committed_offset:
+                healthy = False
+                break
+
+        return healthy
+
+
 class HealthCheckServer(Thread):
-    class SilentHandler(WSGIRequestHandler):
-        """WSGI handler that does not log requests."""
-
-        def log_message(self, format, *args):
-            """Log nothing."""
-
-    class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
-        """Thread per request HTTP server."""
-
-        # Make worker threads "fire and forget". Beginning with Python 3.7 this
-        # prevents a memory leak because ``ThreadingMixIn`` starts to gather all
-        # non-daemon threads in a list in order to join on them at server close.
-        daemon_threads = True
-
     def __init__(self, port: int, is_healthy: Callable[[], bool]):
         super().__init__()
 
         self._is_healthy = is_healthy
         self._port: int = port
-        self._server: Optional[WSGIServer] = make_server(
+        self._server: WSGIServer = make_server(
             "0.0.0.0",
             self._port,
             self._application,
-            self.ThreadingWSGIServer,
-            handler_class=self.SilentHandler,
+            ThreadingWSGIServer,
+            handler_class=SilentHandler,
         )
 
     def _application(self, environ, start_response):
