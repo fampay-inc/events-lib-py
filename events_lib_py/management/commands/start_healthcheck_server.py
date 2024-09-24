@@ -2,7 +2,7 @@ import logging
 import signal
 from wsgiref.simple_server import WSGIServer, make_server
 
-from confluent_kafka import OFFSET_END
+from confluent_kafka import OFFSET_END, ConsumerGroupTopicPartitions
 from confluent_kafka.admin import AdminClient
 from django.core.management.base import BaseCommand, CommandParser
 
@@ -36,7 +36,7 @@ class Command(BaseCommand):
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         consumer_group_offsets = self._admin_client.list_consumer_group_offsets(
-            self._consumer_group_id
+            [ConsumerGroupTopicPartitions(group_id=self._consumer_group_id)]
         )
         topic_partitions = (
             consumer_group_offsets[self._consumer_group_id].result().topic_partitions
