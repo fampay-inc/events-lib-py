@@ -47,7 +47,7 @@ class Command(BaseCommand):
             (tp.topic, tp.partition): tp.offset for tp in topic_partitions
         }
 
-        query_map = {tp: OffsetSpec.latest for tp in topic_partitions}
+        query_map = {tp: OffsetSpec.latest() for tp in topic_partitions}
         latest_offsets = {
             (tp.topic, tp.partition): offset_result.result(timeout=0.2).offset
             for tp, offset_result in self._admin_client.list_offsets(query_map).items()
@@ -87,9 +87,10 @@ class Command(BaseCommand):
         return [b"Not Found"]
 
     def _init(self):
-        self._admin_client = AdminClient(
-            {"bootstrap.servers": config.CONSUMER_CONFIG["bootstrap_servers"]}
-        )
+        self._admin_client = AdminClient({
+            "bootstrap.servers": config.CONSUMER_CONFIG["bootstrap_servers"],
+            "security.protocol": "SSL" if config.CONSUMER_CONFIG["enable_ssl"] else "PLAINTEXT",
+        })
         self._server: WSGIServer = make_server(
             "0.0.0.0",
             self._port,
