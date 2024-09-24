@@ -199,14 +199,15 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
+        committed = self._consumer.committed(assignments)
 
         latest_offsets, committed_offsets = {}, {}
-        for tp in assignments:
+        for tp in committed:
             key = (tp.topic, tp.partition)
             committed_offsets[key] = tp.offset
 
             _, high = self._consumer.get_watermark_offsets(tp)
-            latest_offsets[key] = high - 1
+            latest_offsets[key] = high
 
         return latest_offsets, committed_offsets
 
