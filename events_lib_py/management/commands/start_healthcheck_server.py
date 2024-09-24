@@ -2,8 +2,8 @@ import logging
 import signal
 from wsgiref.simple_server import WSGIServer, make_server
 
-from confluent_kafka import OFFSET_END, ConsumerGroupTopicPartitions
-from confluent_kafka.admin import AdminClient
+from confluent_kafka import ConsumerGroupTopicPartitions
+from confluent_kafka.admin import AdminClient, OffsetSpec
 from django.core.management.base import BaseCommand, CommandParser
 
 from events_lib_py import config
@@ -39,15 +39,17 @@ class Command(BaseCommand):
             [ConsumerGroupTopicPartitions(group_id=self._consumer_group_id)]
         )
         topic_partitions = (
-            consumer_group_offsets[self._consumer_group_id].result().topic_partitions
+            consumer_group_offsets[self._consumer_group_id]
+            .result(timeout=0.2)
+            .topic_partitions
         )
         committed_offsets = {
             (tp.topic, tp.partition): tp.offset for tp in topic_partitions
         }
 
-        query_map = {tp: OFFSET_END for tp in topic_partitions}
+        query_map = {tp: OffsetSpec.latest for tp in topic_partitions}
         latest_offsets = {
-            (tp.topic, tp.partition): offset_result.result().offset
+            (tp.topic, tp.partition): offset_result.result(timeout=0.2).offset
             for tp, offset_result in self._admin_client.list_offsets(query_map).items()
         }
 
