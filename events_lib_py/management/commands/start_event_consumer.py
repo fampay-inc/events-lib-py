@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand, CommandParser
 
 from events_lib_py import HealthCheckServer, KafkaConsumer, config
 from events_lib_py.consumer import KafkaConsumerConfig
+from events_lib_py.healthcheck import FakeHealthCheckServer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class Command(BaseCommand):
         parser.add_argument("--topics", type=str, required=True, nargs="+")
         parser.add_argument("--retry-topic", type=str, required=True)
         parser.add_argument("--dlq-topic", type=str, required=True)
+        parser.add_argument(
+            "--enable-healthcheck-server", type=bool, required=False, default=False
+        )
         parser.add_argument(
             "--healthcheck-port", type=int, required=False, default=None
         )
@@ -72,7 +76,12 @@ class Command(BaseCommand):
             hook()
 
         consumer = KafkaConsumer(config=self._build_consumer_config(kwargs))
-        healthcheck = HealthCheckServer(
+
+        enable_healthcheck_server = kwargs["enable_healthcheck_server"]
+        healthcheck_server_class = (
+            HealthCheckServer if enable_healthcheck_server else FakeHealthCheckServer
+        )
+        healthcheck = healthcheck_server_class(
             port=kwargs.get("healthcheck_port") or config.HEALTHCHECK_PORT,
             is_healthy=consumer.is_healthy,
         )

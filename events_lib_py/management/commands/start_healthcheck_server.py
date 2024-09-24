@@ -87,10 +87,14 @@ class Command(BaseCommand):
         return [b"Not Found"]
 
     def _init(self):
-        self._admin_client = AdminClient({
-            "bootstrap.servers": config.CONSUMER_CONFIG["bootstrap_servers"],
-            "security.protocol": "SSL" if config.CONSUMER_CONFIG["enable_ssl"] else "PLAINTEXT",
-        })
+        self._admin_client = AdminClient(
+            {
+                "bootstrap.servers": config.CONSUMER_CONFIG["bootstrap_servers"],
+                "security.protocol": "SSL"
+                if config.CONSUMER_CONFIG["enable_ssl"]
+                else "PLAINTEXT",
+            }
+        )
         self._server: WSGIServer = make_server(
             "0.0.0.0",
             self._port,

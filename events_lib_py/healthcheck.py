@@ -88,3 +88,17 @@ class HealthCheckServer(Thread):
     def shutdown(self):
         LOGGER.info("msg=%s", "Stopping health check server")
         self._server.shutdown()
+
+
+class FakeHealthCheckServer:
+    def __init__(self, *_, **__) -> None:
+        pass
+
+    def start(self):
+        pass
+
+    def join(self):
+        pass
+
+    def shutdown(self):
+        pass
