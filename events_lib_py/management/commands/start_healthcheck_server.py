@@ -1,5 +1,6 @@
 import logging
 import signal
+from threading import Thread
 from wsgiref.simple_server import WSGIServer, make_server
 
 from confluent_kafka import ConsumerGroupTopicPartitions
@@ -119,5 +120,7 @@ class Command(BaseCommand):
         self._register_signal_handlers()
 
         LOGGER.info("msg=%s port=%s", "Serving health check", self._port)
-        self._server.serve_forever()
+        thread = Thread(target=self._server.serve_forever)
+        thread.start()
+        thread.join()
         LOGGER.info("msg=%s", "Health check server stopped")
