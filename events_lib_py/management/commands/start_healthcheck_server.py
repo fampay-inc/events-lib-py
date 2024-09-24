@@ -29,6 +29,7 @@ class Command(BaseCommand):
                 "Stopping health check server",
                 signal.Signals(signum).name,
             )
+            # FIXME: gevent.exceptions.BlockingSwitchOutError: Impossible to call blocking function in the event loop callback
             self._server.shutdown()
 
         signal.signal(signal.SIGINT, handler)
@@ -36,23 +37,27 @@ class Command(BaseCommand):
         signal.signal(signal.SIGHUP, handler)
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
-        consumer_group_offsets = self._admin_client.list_consumer_group_offsets(
-            [ConsumerGroupTopicPartitions(group_id=self._consumer_group_id)]
-        )
-        topic_partitions = (
-            consumer_group_offsets[self._consumer_group_id]
-            .result(timeout=0.2)
-            .topic_partitions
-        )
-        committed_offsets = {
-            (tp.topic, tp.partition): tp.offset for tp in topic_partitions
-        }
+        latest_offsets, committed_offsets = {}, {}
+        for id in self._consumer_group_ids:
+            consumer_group_offsets = self._admin_client.list_consumer_group_offsets(
+                [ConsumerGroupTopicPartitions(group_id=id)]
+            )
+            topic_partitions = (
+                consumer_group_offsets[id].result(timeout=0.2).topic_partitions
+            )
+            committed_offsets.update(
+                {(tp.topic, tp.partition): tp.offset for tp in topic_partitions}
+            )
 
-        query_map = {tp: OffsetSpec.latest() for tp in topic_partitions}
-        latest_offsets = {
-            (tp.topic, tp.partition): offset_result.result(timeout=0.2).offset
-            for tp, offset_result in self._admin_client.list_offsets(query_map).items()
-        }
+            query_map = {tp: OffsetSpec.latest() for tp in topic_partitions}
+            latest_offsets.update(
+                {
+                    (tp.topic, tp.partition): offset_result.result(timeout=0.2).offset
+                    for tp, offset_result in self._admin_client.list_offsets(
+                        query_map
+                    ).items()
+                }
+            )
 
         return latest_offsets, committed_offsets
 
@@ -105,12 +110,12 @@ class Command(BaseCommand):
         )
 
     def add_arguments(self, parser: CommandParser) -> None:
-        parser.add_argument("--consumer-group-id", type=str, required=True)
+        parser.add_argument("--consumer-group-ids", type=str, required=True, nargs="+")
         parser.add_argument("--port", type=int, required=False, default=9200)
 
     def handle(self, *args, **kwargs):
-        self._consumer_group_id, self._port = (
-            kwargs["consumer_group_id"],
+        self._consumer_group_ids, self._port = (
+            kwargs["consumer_group_ids"],
             kwargs["port"],
         )
 
