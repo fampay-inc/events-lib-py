@@ -17,7 +17,7 @@ LOGGER = logging.getLogger(__name__)
 class Command(BaseCommand):
     """
     Startup command:
-    `python manage.py start_healthcheck_server --consumer-group-id g1 --port 9200`
+    `python manage.py start_healthcheck_server --consumer-group-id g1 g2 --port 9200`
     """
 
     help = "Healthcheck server which checks status for a particular consumer group"
