@@ -162,7 +162,7 @@ class _KafkaConsumerHandlerMixin:
                     msg=msg,
                     event_name=event.name,
                     err_msg="Event handler sent for DLQ",
-                    exc=response.exc,
+                    exc=response.exception,
                 )
                 return
 
