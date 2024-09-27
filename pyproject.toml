@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "events-lib-py"
-version = "0.1.0"
+version = "0.1.2"
 description = "A Django plugin to integrate Kafka producer and consumer"
 authors = ["galaxyzpjfp <pranav.jain@fampay.in>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.8"
 Django = "*"
-confluent-kafka = "^2.5.3"
+confluent-kafka = "==2.3.0"
 gevent = "^24.2.1"
 prometheus-client = ">=0.7"
 
