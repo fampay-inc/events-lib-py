@@ -75,6 +75,7 @@ class KafkaProducer:
         topic: str,
         id: bytes,
         message: bytes,
+        headers: Optional[dict] = None,
         queued_callback: Optional[Callable] = None,
         sent_callback: Optional[Callable] = None,
     ) -> None:
@@ -84,6 +85,7 @@ class KafkaProducer:
             key=id,
             value=message,
             callback=sent_callback,
+            headers=headers,
         )
 
         if callable(queued_callback):
