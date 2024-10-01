@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "events-lib-py"
-version = "0.1.2"
+version = "0.1.3"
 description = "A Django plugin to integrate Kafka producer and consumer"
 authors = ["galaxyzpjfp <pranav.jain@fampay.in>"]
 readme = "README.md"
