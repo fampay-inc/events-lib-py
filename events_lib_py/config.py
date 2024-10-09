@@ -69,7 +69,9 @@ def load_producer_config() -> dict:
 
 IS_TEST_ENV: bool = get_or_default("IS_TEST_ENV")
 
-PRE_INIT_HOOK: "Optional[str | Callable]" = get_or_default("PRE_INIT_HOOK")
+PRE_INIT_HOOK: "Optional[str | Callable[[Optional[int]], None]]" = get_or_default(
+    "PRE_INIT_HOOK"
+)
 if PRE_INIT_HOOK and isinstance(PRE_INIT_HOOK, str):
     PRE_INIT_HOOK = import_from_string(PRE_INIT_HOOK)
 

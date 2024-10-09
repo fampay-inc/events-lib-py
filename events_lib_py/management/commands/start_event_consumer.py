@@ -43,6 +43,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--healthcheck-port", type=int, required=False, default=None
         )
+        parser.add_argument("--metrics-port", type=int, required=False, default=None)
 
     def _build_consumer_config(self, kwargs: dict) -> KafkaConsumerConfig:
         group_id, topics, retry_topic, dlq_topic = (
@@ -73,7 +74,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         if hook := config.PRE_INIT_HOOK:
-            hook()
+            metrics_port = kwargs.get("metrics_port")
+            hook(metrics_port)
 
         consumer = KafkaConsumer(config=self._build_consumer_config(kwargs))
 
