@@ -26,7 +26,7 @@ class KafkaConsumerConfig:
     topics: "list[str]"
     retry_topic: str
     dlq_topic: str
-    event_handler_map: "dict[str, Callable[[bytes], EventHandlerResponse]]"
+    event_handler_map: "dict[str, Callable[[str, bytes], EventHandlerResponse]]"
     max_retries_per_event_map: "dict[str, int]"
 
     bootstrap_servers: str = "127.0.0.1:9092"
@@ -139,7 +139,7 @@ class _KafkaConsumerHandlerMixin:
             return
 
         try:
-            response = handler(event.payload)
+            response = handler(key, event.payload)
             if response.success:
                 LOGGER.info("msg=%s key=%s", "Processed message successfully", key)
                 return
