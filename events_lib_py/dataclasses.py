@@ -13,35 +13,35 @@ class EventHandlerResponse:
 
 @dataclass
 class KafkaConsumerControllerConfig:
-    _batch_size: Synchronized[int] = field(default_factory=lambda: Value("i", 10))
-    _batch_failure_event_percentage: Synchronized[int] = field(
+    _batch_size: "Synchronized[int]" = field(default_factory=lambda: Value("i", 10))
+    _batch_failure_event_percentage: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _throttle_after_failed_batch_threshold: Synchronized[int] = field(
+    _throttle_after_failed_batch_threshold: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _reset_throttle_after_success_batch_threshold: Synchronized[int] = field(
+    _reset_throttle_after_success_batch_threshold: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_exponential_backoff_enabled: Synchronized[int] = field(
+    _retry_exponential_backoff_enabled: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_exponential_backoff_initial_delay: Synchronized[int] = field(
+    _retry_exponential_backoff_initial_delay: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_exponential_backoff_coefficient: Synchronized[int] = field(
+    _retry_exponential_backoff_coefficient: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_exponential_backoff_max_delay: Synchronized[int] = field(
+    _retry_exponential_backoff_max_delay: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_batch_size_slice_percentage: Synchronized[int] = field(
+    _retry_batch_size_slice_percentage: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_min_batch_size: Synchronized[int] = field(
+    _retry_min_batch_size: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
-    _retry_batch_size_restore_percentage: Synchronized[int] = field(
+    _retry_batch_size_restore_percentage: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
 
@@ -101,14 +101,14 @@ class KafkaConsumerControllerConfig:
             return self._retry_batch_size_restore_percentage.value
 
     def update(self, attr_name: str, value: int):
-        attr: Synchronized[int] = getattr(self, f"_{attr_name}")
+        attr: "Synchronized[int]" = getattr(self, f"_{attr_name}")
         with attr.get_lock():
             attr.value = value
 
 
 @dataclass
 class KafkaConsumerControllerFlag:
-    _retry_consumer_enabled: Synchronized[int] = field(
+    _retry_consumer_enabled: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
 
@@ -118,6 +118,6 @@ class KafkaConsumerControllerFlag:
             return self._retry_consumer_enabled.value
 
     def update(self, attr_name: str, value: int):
-        attr: Synchronized[int] = getattr(self, f"_{attr_name}")
+        attr: "Synchronized[int]" = getattr(self, f"_{attr_name}")
         with attr.get_lock():
             attr.value = value
