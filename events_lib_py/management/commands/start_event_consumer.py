@@ -76,7 +76,7 @@ class Command(BaseCommand):
         mode, group_id, controller_topic, topics, retry_topic, dlq_topic = (
             kwargs["mode"],
             kwargs["group_id"],
-            kwargs["controller-topic"],
+            kwargs["controller_topic"],
             kwargs["topics"],
             kwargs["retry_topic"],
             kwargs["dlq_topic"],
