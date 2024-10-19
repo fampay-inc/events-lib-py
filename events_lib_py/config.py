@@ -2,6 +2,11 @@ from typing import Any, Callable, Optional
 from django.conf import settings
 from django.utils.module_loading import import_string
 
+from events_lib_py.dataclasses import (
+    KafkaConsumerControllerConfig,
+    KafkaConsumerControllerFlag,
+)
+
 
 DEFAULTS = {
     "IS_TEST_ENV": False,
@@ -79,3 +84,6 @@ PRODUCER_CONFIG: dict = load_producer_config()
 CONSUMER_CONFIG: dict = load_consumer_config()
 
 HEALTHCHECK_PORT: int = get_or_default("HEALTHCHECK_PORT")
+
+CONSUMER_CONTROLLER_CONFIG = KafkaConsumerControllerConfig()
+CONSUMER_CONTROLLER_FLAG = KafkaConsumerControllerFlag()

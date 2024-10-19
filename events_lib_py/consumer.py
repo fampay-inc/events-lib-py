@@ -7,6 +7,7 @@ from typing import Callable, Optional
 from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
+from events_lib_py.constants import ConsumerMode
 from events_lib_py.healthcheck import HealthCheckUtil
 
 from .dataclasses import EventHandlerResponse
@@ -22,7 +23,9 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class KafkaConsumerConfig:
+    mode: str
     group_id: str
+    controller_topic: str
     topics: "list[str]"
     retry_topic: str
     dlq_topic: str
@@ -45,14 +48,21 @@ class KafkaConsumerConfig:
             self.generic_exception_handler = lambda _: ...
 
     def to_confluent_config(self) -> dict:
-        return {
+        d = {
             "security.protocol": "SSL" if self.enable_ssl else "PLAINTEXT",
             "bootstrap.servers": self.bootstrap_servers,
-            "group.id": self.group_id,
             "enable.auto.commit": self.auto_commit,
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
         }
+        if self.mode != ConsumerMode.CONTROLLER:
+            d.update(
+                {
+                    "group.id": self.group_id,
+                }
+            )
+
+        return d
 
 
 class _KafkaConsumerHandlerMixin:
@@ -176,20 +186,25 @@ class _KafkaConsumerHandlerMixin:
 
 
 class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
+    entity = "consumer"
+    gevent_pool_size = 1000
+
     def __init__(self, config: KafkaConsumerConfig):
+        LOGGER.info("msg=%s entity=%s", "Initializing loop", self.entity)
+
         super().__init__()
         self._config = config
         self._consumer = Consumer(config.to_confluent_config())
         self._check_broker_connection()
-        self._consumer.subscribe(config.topics)
-        self._pool = Pool(size=config.batch_size)
+        self._subscribe_topic()
+        self._pool = Pool(size=self.gevent_pool_size)
         self._keep_running = True
         self._prev_committed_offsets: "dict[tuple, int]" = {}
 
         self.exception_handler = config.generic_exception_handler
 
     def shutdown(self):
-        LOGGER.info("msg=%s", "Stopping consumer loop")
+        LOGGER.info("msg=%s entity=%s", "Stopping loop", self.entity)
         self._keep_running = False
 
     def _check_broker_connection(self):
@@ -198,6 +213,17 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         LOGGER.info(
             "msg=%s topics=%s", "Connected to broker", ", ".join(metadata.topics.keys())
         )
+
+    def _subscribe_topic(self):
+        topic_to_be_subscribed = (
+            self._config.controller_topic
+            if self.is_controller()
+            else self._config.topics
+        )
+        self._consumer.subscribe(topic_to_be_subscribed)
+
+    def is_controller(self) -> bool:
+        return self._config.mode == ConsumerMode.CONTROLLER
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
@@ -238,6 +264,11 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
                         "End of partition reached",
                         msg.partition(),
                     )
+                    if self.is_controller() and self.initial_run:
+                        # Stop consumer if all configs / flags have
+                        # been fetched from controller topic.
+                        LOGGER.info("msg=%s", "Finished syncing with controller")
+                        self.shutdown()
                 else:
                     self.exception_handler(Exception(err))
                 continue
@@ -263,7 +294,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
             self.exception_handler(e)
 
     def run(self):
-        LOGGER.info("msg=%s", "Starting consumer loop")
+        LOGGER.info("msg=%s entity=%s", "Starting loop", self.entity)
 
         try:
             while self._keep_running:
@@ -279,4 +310,4 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
             self.exception_handler(e)
 
         self._consumer.close()
-        LOGGER.info("msg=%s", "Consumer loop stopped")
+        LOGGER.info("msg=%s entity=%s", "Loop stopped", self.entity)
