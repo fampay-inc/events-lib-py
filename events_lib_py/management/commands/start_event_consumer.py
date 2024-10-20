@@ -105,7 +105,12 @@ class Command(BaseCommand):
         }
 
         return (
-            KafkaConsumerConfig(mode=ConsumerMode.CONTROLLER, **config_dict),
+            KafkaConsumerConfig(
+                mode=ConsumerMode.CONTROLLER,
+                # FIXME: Solve for multiple consumer instances with same group id
+                group_id=f"{group_id}.controller",
+                **config_dict,
+            ),
             KafkaConsumerConfig(mode=mode, group_id=group_id, **config_dict),
         )
 
