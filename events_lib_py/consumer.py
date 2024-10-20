@@ -208,15 +208,25 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         )
 
     def _subscribe_topic(self):
-        topic_to_be_subscribed = (
-            self._config.controller_topic
-            if self.is_controller()
-            else self._config.topics
-        )
-        self._consumer.subscribe(topic_to_be_subscribed)
+        def on_assign(_: Consumer, partitions: "list[TopicPartition]"):
+            LOGGER.info("msg=%s partitions=%s", "Assigned partitions", partitions)
+            # Resetting previous committed offsets since
+            # another partition can be reassigned to the
+            # consumer.
+            self._prev_committed_offsets = {}
+
+        self._consumer.subscribe(self._config.topics, on_assign=on_assign)
 
     def is_controller(self) -> bool:
         return self._config.mode == ConsumerMode.CONTROLLER
+
+    def _handle_partition_end_reached(self):
+        """
+        Should comprise of code that is to be executed when
+        committed offset of consumer is the same as latest message
+        offset of the assigned partition.
+        """
+        pass
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
@@ -257,11 +267,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
                         "End of partition reached",
                         msg.partition(),
                     )
-                    if self.is_controller() and self.initial_run:
-                        # Stop consumer if all configs / flags have
-                        # been fetched from controller topic.
-                        LOGGER.info("msg=%s", "Finished syncing with controller")
-                        self.shutdown()
+                    self._handle_partition_end_reached()
                 else:
                     self.exception_handler(Exception(err))
                 continue
@@ -294,6 +300,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
                 batch = self._fetch_batch()
 
                 if not batch:
+                    self._handle_partition_end_reached()
                     time.sleep(0.1)
                     continue
 

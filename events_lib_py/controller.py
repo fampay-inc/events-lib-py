@@ -1,4 +1,7 @@
 from typing import Callable
+
+from confluent_kafka import TopicPartition, OFFSET_BEGINNING
+
 from events_lib_py import config
 from events_lib_py.consumer import LOGGER, KafkaConsumer
 from events_lib_py.dataclasses import EventHandlerResponse
@@ -12,7 +15,7 @@ class KafkaConsumerController(KafkaConsumer):
     gevent_pool_size = 100
     attr_dataclass_map = {
         "config": config.CONSUMER_CONTROLLER_CONFIG,
-        "flag": config.CONSUMER_CONTROLLER_CONFIG,
+        "flag": config.CONSUMER_CONTROLLER_FLAG,
     }
 
     def __init__(
@@ -21,6 +24,34 @@ class KafkaConsumerController(KafkaConsumer):
         super().__init__(config)
         self.attr_apply_handlers = attr_apply_handlers
         self.initial_run = True
+
+    def _subscribe_topic(self):
+        partitions = [
+            TopicPartition(
+                topic=self._config.controller_topic,
+                partition=0,
+                offset=OFFSET_BEGINNING,
+            )
+        ]
+        self._consumer.assign(partitions)
+        init_msg = self._consumer.poll(10)
+
+        err = None
+        if init_msg is None:
+            err = "Partition assignment timed out"
+        elif init_msg.error():
+            err = f"Error occurred during partition assignment: {init_msg.error()}"
+
+        if err:
+            raise Exception(err)
+
+    def _handle_partition_end_reached(self):
+        super()._handle_partition_end_reached()
+        if self.initial_run:
+            # Stop consumer if all configs / flags have
+            # been fetched from controller topic.
+            LOGGER.info("msg=%s", "Finished syncing with controller")
+            self.shutdown()
 
     def process_message(self, msg) -> EventHandlerResponse:
         """
