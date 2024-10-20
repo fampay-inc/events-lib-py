@@ -48,21 +48,14 @@ class KafkaConsumerConfig:
             self.generic_exception_handler = lambda _: ...
 
     def to_confluent_config(self) -> dict:
-        d = {
+        return {
             "security.protocol": "SSL" if self.enable_ssl else "PLAINTEXT",
             "bootstrap.servers": self.bootstrap_servers,
+            "group.id": self.group_id,
             "enable.auto.commit": self.auto_commit,
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
         }
-        if self.mode != ConsumerMode.CONTROLLER:
-            d.update(
-                {
-                    "group.id": self.group_id,
-                }
-            )
-
-        return d
 
 
 class _KafkaConsumerHandlerMixin:
