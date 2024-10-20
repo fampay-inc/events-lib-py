@@ -24,6 +24,7 @@ LOGGER = logging.getLogger(__name__)
 @dataclass
 class KafkaConsumerConfig:
     mode: str
+    group_id: str
     controller_topic: str
     topics: "list[str]"
     retry_topic: str
@@ -31,7 +32,6 @@ class KafkaConsumerConfig:
     event_handler_map: "dict[str, Callable[[str, bytes], EventHandlerResponse]]"
     max_retries_per_event_map: "dict[str, int]"
 
-    group_id: Optional[str] = None
     bootstrap_servers: str = "127.0.0.1:9092"
     enable_ssl: bool = True
     auto_commit: bool = False
@@ -55,7 +55,7 @@ class KafkaConsumerConfig:
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
         }
-        if self.group_id:
+        if self.mode != ConsumerMode.CONTROLLER:
             d.update(
                 {
                     "group.id": self.group_id,
