@@ -13,7 +13,7 @@ class EventHandlerResponse:
 
 @dataclass
 class KafkaConsumerControllerConfig:
-    _batch_size: "Synchronized[int]" = field(default_factory=lambda: Value("i", 10))
+    _batch_size: "Synchronized[int]" = field(default_factory=lambda: Value("i", 1))
     _batch_failure_event_percentage: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
