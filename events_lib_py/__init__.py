@@ -23,6 +23,7 @@ __all__ = (
     "KafkaProducer",
     "KafkaProducerConfig",
     "send_event",
+    "send_raw_message",
 )
 
 
@@ -130,4 +131,26 @@ def send_to_dlq(
         sent_callback=generate_sent_callback(
             topic=dlq_topic, event_id=id.decode(), event_name=event_name
         ),
+    )
+
+
+def send_raw_message(
+    topic: str,
+    key: bytes,
+    value: bytes,
+    headers: Optional[dict] = None,
+    queued_callback: Optional[Callable] = None,
+    sent_callback: Optional[Callable] = None,
+):
+    global default_producer
+    if default_producer is None:
+        init_producer()
+
+    default_producer.send_message(
+        topic=topic,
+        key=key,
+        value=value,
+        headers=headers,
+        queued_callback=queued_callback,
+        sent_callback=sent_callback,
     )

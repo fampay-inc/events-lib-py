@@ -73,8 +73,8 @@ class KafkaProducer:
     def send_message(
         self,
         topic: str,
-        id: bytes,
-        message: bytes,
+        key: bytes,
+        value: bytes,
         headers: Optional[dict] = None,
         queued_callback: Optional[Callable] = None,
         sent_callback: Optional[Callable] = None,
@@ -82,8 +82,8 @@ class KafkaProducer:
         self._producer.poll(0)
         self._producer.produce(
             topic=topic,
-            key=id,
-            value=message,
+            key=key,
+            value=value,
             callback=sent_callback,
             headers=headers,
         )

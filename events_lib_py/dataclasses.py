@@ -15,34 +15,32 @@ class EventHandlerResponse:
 class KafkaConsumerControllerConfig:
     _batch_size: "Synchronized[int]" = field(default_factory=lambda: Value("i", 10))
     _batch_failure_event_percentage: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+        default_factory=lambda: Value("i", 30)
     )
     _throttle_after_failed_batch_threshold: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+        default_factory=lambda: Value("i", 3)
     )
     _reset_throttle_after_success_batch_threshold: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+        default_factory=lambda: Value("i", 5)
     )
-    _retry_exponential_backoff_enabled: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+    _exponential_backoff_enabled: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 1)
     )
-    _retry_exponential_backoff_initial_delay: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+    _exponential_backoff_initial_delay: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 2)
     )
-    _retry_exponential_backoff_coefficient: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+    _exponential_backoff_coefficient: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 2)
     )
-    _retry_exponential_backoff_max_delay: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+    _exponential_backoff_max_delay: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 1800)
     )
-    _retry_batch_size_slice_percentage: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+    _batch_size_slice_percentage: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 30)
     )
-    _retry_min_batch_size: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
-    )
-    _retry_batch_size_restore_percentage: "Synchronized[int]" = field(
-        default_factory=lambda: Value("i", 0)
+    _min_batch_size: "Synchronized[int]" = field(default_factory=lambda: Value("i", 2))
+    _batch_size_restore_percentage: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 30)
     )
 
     @property
@@ -66,42 +64,42 @@ class KafkaConsumerControllerConfig:
             return self._reset_throttle_after_success_batch_threshold.value
 
     @property
-    def retry_exponential_backoff_enabled(self) -> int:
-        with self._retry_exponential_backoff_enabled.get_lock():
-            return self._retry_exponential_backoff_enabled.value
+    def exponential_backoff_enabled(self) -> int:
+        with self._exponential_backoff_enabled.get_lock():
+            return self._exponential_backoff_enabled.value
 
     @property
-    def retry_exponential_backoff_initial_delay(self) -> int:
-        with self._retry_exponential_backoff_initial_delay.get_lock():
-            return self._retry_exponential_backoff_initial_delay.value
+    def exponential_backoff_initial_delay(self) -> int:
+        with self._exponential_backoff_initial_delay.get_lock():
+            return self._exponential_backoff_initial_delay.value
 
     @property
-    def retry_exponential_backoff_coefficient(self) -> int:
-        with self._retry_exponential_backoff_coefficient.get_lock():
-            return self._retry_exponential_backoff_coefficient.value
+    def exponential_backoff_coefficient(self) -> int:
+        with self._exponential_backoff_coefficient.get_lock():
+            return self._exponential_backoff_coefficient.value
 
     @property
-    def retry_exponential_backoff_max_delay(self) -> int:
-        with self._retry_exponential_backoff_max_delay.get_lock():
-            return self._retry_exponential_backoff_max_delay.value
+    def exponential_backoff_max_delay(self) -> int:
+        with self._exponential_backoff_max_delay.get_lock():
+            return self._exponential_backoff_max_delay.value
 
     @property
-    def retry_batch_size_slice_percentage(self) -> int:
-        with self._retry_batch_size_slice_percentage.get_lock():
-            return self._retry_batch_size_slice_percentage.value
+    def batch_size_slice_percentage(self) -> int:
+        with self._batch_size_slice_percentage.get_lock():
+            return self._batch_size_slice_percentage.value
 
     @property
-    def retry_min_batch_size(self) -> int:
-        with self._retry_min_batch_size.get_lock():
-            return self._retry_min_batch_size.value
+    def min_batch_size(self) -> int:
+        with self._min_batch_size.get_lock():
+            return self._min_batch_size.value
 
     @property
-    def retry_batch_size_restore_percentage(self) -> int:
-        with self._retry_batch_size_restore_percentage.get_lock():
-            return self._retry_batch_size_restore_percentage.value
+    def batch_size_restore_percentage(self) -> int:
+        with self._batch_size_restore_percentage.get_lock():
+            return self._batch_size_restore_percentage.value
 
-    def update(self, attr_name: str, value: int):
-        attr: "Synchronized[int]" = getattr(self, f"_{attr_name}")
+    def setattr(self, name: str, value: int):
+        attr: "Synchronized[int]" = getattr(self, f"_{name}")
         with attr.get_lock():
             attr.value = value
 
@@ -117,7 +115,25 @@ class KafkaConsumerControllerFlag:
         with self._retry_consumer_enabled.get_lock():
             return self._retry_consumer_enabled.value
 
-    def update(self, attr_name: str, value: int):
-        attr: "Synchronized[int]" = getattr(self, f"_{attr_name}")
+    @retry_consumer_enabled.setter
+    def retry_consumer_enabled(self, value: int):
+        with self._retry_consumer_enabled.get_lock():
+            self._retry_consumer_enabled.value = value
+
+        from .controller import KafkaConsumerControllerFlagNotification
+
+        KafkaConsumerControllerFlagNotification(
+            flag_name="retry_consumer_enabled",
+            flag_value=value,
+        ).notify_controller()
+
+    def setattr(self, name: str, value: int):
+        attr: "Synchronized[int]" = getattr(self, f"_{name}")
         with attr.get_lock():
             attr.value = value
+
+
+@dataclass
+class ConsumerBatchCounter:
+    consecutive_failed_batch_count: int = 0
+    consecutive_success_batch_post_recovery_count: int = 0
