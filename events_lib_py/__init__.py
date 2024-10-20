@@ -100,8 +100,8 @@ def send_event(
     )
     default_producer.send_message(
         topic=topic,
-        id=event_id.encode(),
-        message=event.SerializeToString(),
+        key=event_id.encode(),
+        value=event.SerializeToString(),
         queued_callback=generate_queued_callback(
             topic=topic, event_id=event_id, event_name=event.name
         ),
@@ -120,16 +120,16 @@ def send_to_dlq(
     if default_producer is None:
         init_producer()
 
-    id = msg.key()
+    key = msg.key()
     default_producer.send_message(
         topic=dlq_topic,
-        id=id,
-        message=msg.value(),
+        key=key,
+        value=msg.value(),
         queued_callback=generate_queued_callback(
-            topic=dlq_topic, event_id=id.decode(), event_name=event_name
+            topic=dlq_topic, event_id=key.decode(), event_name=event_name
         ),
         sent_callback=generate_sent_callback(
-            topic=dlq_topic, event_id=id.decode(), event_name=event_name
+            topic=dlq_topic, event_id=key.decode(), event_name=event_name
         ),
     )
 
