@@ -115,18 +115,6 @@ class KafkaConsumerControllerFlag:
         with self._retry_consumer_enabled.get_lock():
             return self._retry_consumer_enabled.value
 
-    @retry_consumer_enabled.setter
-    def retry_consumer_enabled(self, value: int):
-        with self._retry_consumer_enabled.get_lock():
-            self._retry_consumer_enabled.value = value
-
-        from .controller import KafkaConsumerControllerFlagNotification
-
-        KafkaConsumerControllerFlagNotification(
-            flag_name="retry_consumer_enabled",
-            flag_value=value,
-        ).notify_controller()
-
     def setattr(self, name: str, value: int):
         attr: "Synchronized[int]" = getattr(self, f"_{name}")
         with attr.get_lock():

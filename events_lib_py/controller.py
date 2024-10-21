@@ -89,7 +89,8 @@ class KafkaConsumerController(KafkaConsumer):
 
 
 class KafkaConsumerControllerFlagNotification:
-    def __init__(self, flag_name: str, flag_value: int):
+    def __init__(self, controller_topic: str, flag_name: str, flag_value: int):
+        self.controller_topic = controller_topic
         self.flag_name = flag_name
         self.flag_value = flag_value
 
@@ -125,7 +126,7 @@ class KafkaConsumerControllerFlagNotification:
         from . import send_raw_message
 
         send_raw_message(
-            topic=self._config.controller_topic,
+            topic=self.controller_topic,
             key=f"flag:{self.flag_name}".encode(),
             value=f"{self.flag_value}".encode(),
             queued_callback=self._generate_notification_queued_callback(),

@@ -8,7 +8,7 @@ from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
 from events_lib_py import config
-from events_lib_py.constants import ConsumerMode
+from events_lib_py.constants import ConsumerMode, KafkaConsumerControllerFlagName
 from events_lib_py.healthcheck import HealthCheckUtil
 
 from .dataclasses import ConsumerBatchCounter, EventHandlerResponse
@@ -181,6 +181,15 @@ class _KafkaConsumerHandlerMixin:
 
 
 class _KafkaConsumerRateControlMixin:
+    def _notify_controller(self, flag_name: str, flag_value: int):
+        from .controller import KafkaConsumerControllerFlagNotification
+
+        KafkaConsumerControllerFlagNotification(
+            controller_topic=self._config.controller_topic,
+            flag_name=flag_name,
+            flag_value=flag_value,
+        ).notify_controller()
+
     def init_batch_counter(self):
         self.batch_counter = ConsumerBatchCounter()
 
@@ -207,7 +216,9 @@ class _KafkaConsumerRateControlMixin:
         # Disable retry consumer when first failed batch received
         if self.batch_counter.consecutive_failed_batch_count == 0:
             # Sending notification to controller topic to disable retry consumer
-            config.CONSUMER_CONTROLLER_FLAG.retry_consumer_enabled = 0
+            self._notify_controller(
+                KafkaConsumerControllerFlagName.retry_consumer_enabled, 0
+            )
 
         # Increment consecutive failed batch counter and check if it reached exponential backoff threshold
         self.batch_counter.consecutive_failed_batch_count += 1
@@ -282,7 +293,9 @@ class _KafkaConsumerRateControlMixin:
         LOGGER.info("msg=%s", "System considered as recovered")
 
         # Sending notification to controller topic to enable retry consumer
-        config.CONSUMER_CONTROLLER_FLAG.retry_consumer_enabled = 1
+        self._notify_controller(
+            KafkaConsumerControllerFlagName.retry_consumer_enabled, 1
+        )
 
     def restore_batch_size(self):
         """
@@ -360,7 +373,9 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, _KafkaConsumerRateControlMixin, 
         """
         if self._config.mode == ConsumerMode.RETRY:
             # Sending notification to controller topic to disable retry consumer
-            config.CONSUMER_CONTROLLER_FLAG.retry_consumer_enabled = 0
+            self._notify_controller(
+                KafkaConsumerControllerFlagName.retry_consumer_enabled, 0
+            )
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
