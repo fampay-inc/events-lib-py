@@ -158,7 +158,7 @@ class _KafkaConsumerHandlerMixin:
                     )
                     return EventHandlerResponse(dlq=True)
                 else:
-                    self._handle_retry(event=event)
+                    self._handle_retry(msg=msg, event=event)
                     return response
 
             if response.dlq:
