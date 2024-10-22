@@ -157,7 +157,11 @@ class KafkaConsumerHealthCheckMixin:
             committed_offsets=committed_offsets,
         )
         self._prev_committed_offsets = committed_offsets
-        return healthy
+        return healthy or (
+            # Consumer thread is alive but loop is under exponential backoff
+            getattr(self, "under_backoff", False)
+            and self.is_alive()
+        )
 
 
 class KafkaConsumerRateControlMixin:
