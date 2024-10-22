@@ -3,13 +3,24 @@ import signal
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from events_lib_py import HealthCheckServer, KafkaConsumer, config
-from events_lib_py.controller import KafkaConsumerController
+from events_lib_py import HealthCheckServer, config
 from events_lib_py.constants import ConsumerMode
-from events_lib_py.consumer import KafkaConsumerConfig
+from events_lib_py.consumer import (
+    BaseKafkaConsumer,
+    Controller,
+    MainConsumer,
+    KafkaConsumerConfig,
+    RetryConsumer,
+)
 from events_lib_py.healthcheck import FakeHealthCheckServer
 
 LOGGER = logging.getLogger(__name__)
+
+MODE_CONSUMER_MAP: "dict[str, BaseKafkaConsumer]" = {
+    ConsumerMode.MAIN: MainConsumer,
+    ConsumerMode.RETRY: RetryConsumer,
+    ConsumerMode.CONTROLLER: Controller,
+}
 
 
 class Command(BaseCommand):
@@ -33,8 +44,8 @@ class Command(BaseCommand):
 
     def _register_signal_handlers(
         self,
-        consumer: KafkaConsumer,
-        controller: KafkaConsumerController,
+        consumer: BaseKafkaConsumer,
+        controller: Controller,
         healthcheck: HealthCheckServer,
     ):
         def handler(signum, _):
@@ -121,7 +132,7 @@ class Command(BaseCommand):
 
         controller_config, consumer_config = self._build_consumer_configs(kwargs)
 
-        controller = KafkaConsumerController(
+        controller = Controller(
             config=controller_config,
             attr_apply_handlers={
                 "config:batch_size": lambda val: setattr(
@@ -131,7 +142,7 @@ class Command(BaseCommand):
         )
         controller.sync()
 
-        consumer = KafkaConsumer(config=consumer_config)
+        consumer = MODE_CONSUMER_MAP[consumer_config.mode](config=consumer_config)
 
         enable_healthcheck_server = kwargs["enable_healthcheck_server"]
         healthcheck_server_class = (

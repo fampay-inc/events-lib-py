@@ -5,7 +5,10 @@ from typing import Any, Callable, Optional
 from confluent_kafka import Message
 
 from .config import IS_TEST_ENV, PRODUCER_CONFIG
-from .consumer import KafkaConsumer, KafkaConsumerConfig
+from .consumer import (
+    KafkaConsumerConfig as ConsumerConfig,
+    MainConsumer as Consumer,
+)
 from .dataclasses import EventHandlerResponse
 from .healthcheck import HealthCheckServer
 from .metrics import (
@@ -16,10 +19,10 @@ from .pb.event_pb2 import Event
 from .producer import FakeKafkaProducer, KafkaProducer, KafkaProducerConfig
 
 __all__ = (
+    "Consumer",
+    "ConsumerConfig",
     "EventHandlerResponse",
     "HealthCheckServer",
-    "KafkaConsumer",
-    "KafkaConsumerConfig",
     "KafkaProducer",
     "KafkaProducerConfig",
     "send_event",
