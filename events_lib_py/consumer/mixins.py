@@ -302,5 +302,8 @@ class KafkaConsumerRateControlMixin:
             ),
             config.CONSUMER_CONTROLLER_CONFIG.batch_size,
         )
+        LOGGER.info(
+            "msg=%s batch_size=%s", "Restoring batch size", self._config.batch_size
+        )
         if self._config.batch_size == config.CONSUMER_CONTROLLER_CONFIG.batch_size:
             self.batch_counter.consecutive_success_batch_post_recovery_count = 0

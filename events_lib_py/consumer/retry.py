@@ -5,7 +5,7 @@ from events_lib_py import config
 from events_lib_py.constants import KafkaConsumerControllerFlagName
 
 from .base import BaseKafkaConsumer
-from .mixins import KafkaConsumerHealthCheckMixin
+from .mixins import KafkaConsumerHealthCheckMixin, KafkaConsumerRateControlMixin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -13,6 +13,7 @@ LOGGER = logging.getLogger(__name__)
 class RetryConsumer(
     BaseKafkaConsumer,
     KafkaConsumerHealthCheckMixin,
+    KafkaConsumerRateControlMixin,
 ):
     def _handle_partition_end_reached(self):
         # Sending notification to controller topic to disable retry consumer
