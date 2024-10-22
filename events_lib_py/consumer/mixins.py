@@ -15,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 
 class KafkaConsumerHandlerMixin:
     def _handle_retry(self, msg: Message, event: Event):
-        from . import send_event
+        from events_lib_py import send_event
 
         retry_count = event.retry_count + 1
         LOGGER.info(
@@ -40,7 +40,7 @@ class KafkaConsumerHandlerMixin:
         err_msg: Optional[str] = None,
         exc: Optional[Exception] = None,
     ):
-        from . import send_to_dlq
+        from events_lib_py import send_to_dlq
 
         LOGGER.info(
             "msg=%s key=%s event_name=%s err_msg=%s exc=%s",

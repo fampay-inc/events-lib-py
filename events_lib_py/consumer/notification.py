@@ -41,7 +41,7 @@ class ControllerFlagNotification:
         return callback
 
     def notify_controller(self):
-        from . import send_raw_message
+        from events_lib_py import send_raw_message
 
         send_raw_message(
             topic=self.controller_topic,
