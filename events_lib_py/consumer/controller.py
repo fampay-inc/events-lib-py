@@ -1,10 +1,13 @@
+import logging
 from typing import Callable
 
 from confluent_kafka import Consumer, TopicPartition, OFFSET_BEGINNING
 
 from events_lib_py import config
-from events_lib_py.consumer import LOGGER, BaseKafkaConsumer
+from events_lib_py.consumer import BaseKafkaConsumer
 from events_lib_py.dataclasses import EventHandlerResponse
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Controller(BaseKafkaConsumer):
