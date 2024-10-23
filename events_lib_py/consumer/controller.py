@@ -14,8 +14,8 @@ class Controller(BaseKafkaConsumer):
     entity = "controller"
     gevent_pool_size = 100
     attr_dataclass_map = {
-        "config": config.CONSUMER_CONTROLLER_CONFIG,
-        "flag": config.CONSUMER_CONTROLLER_FLAG,
+        "config": config.CONTROLLER_CONFIG,
+        "flag": config.CONTROLLER_FLAG,
     }
 
     def __init__(

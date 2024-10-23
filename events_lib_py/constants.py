@@ -5,5 +5,6 @@ class ConsumerMode:
     DLQ = "dlq"
 
 
-class KafkaConsumerControllerFlagName:
+class ControllerFlagName:
     retry_consumer_enabled = "retry_consumer_enabled"
+    system_in_degraded_state = "system_in_degraded_state"

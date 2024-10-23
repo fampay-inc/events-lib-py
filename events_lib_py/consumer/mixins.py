@@ -4,7 +4,7 @@ from typing import Optional
 from confluent_kafka import Message, TopicPartition
 
 from events_lib_py import config
-from events_lib_py.constants import KafkaConsumerControllerFlagName
+from events_lib_py.constants import ControllerFlagName
 from events_lib_py.dataclasses import ConsumerBatchCounter, EventHandlerResponse
 from events_lib_py.healthcheck import HealthCheckUtil
 from events_lib_py.metrics import KAFKA_MESSAGE_SENT_TO_DLQ_TOTAL
@@ -176,6 +176,12 @@ class KafkaConsumerRateControlMixin:
 
     def init_batch_counter(self):
         self.batch_counter = ConsumerBatchCounter()
+        if config.CONTROLLER_FLAG.system_in_degraded_state:
+            self.batch_counter.consecutive_failed_batch_count = (
+                config.CONTROLLER_CONFIG.throttle_after_failed_batch_threshold
+            )
+
+        self.processed_batch_successfully = False
 
     def is_failed_batch(self, results: "list[EventHandlerResponse]") -> bool:
         """
@@ -188,7 +194,7 @@ class KafkaConsumerRateControlMixin:
                 retried_event_count += 1
 
         return (retried_event_count / self._config.batch_size) >= (
-            config.CONSUMER_CONTROLLER_CONFIG.batch_failure_event_percentage / 100
+            config.CONTROLLER_CONFIG.batch_failure_event_percentage / 100
         )
 
     def evaluate_exponential_backoff(self) -> Optional[int]:
@@ -206,56 +212,52 @@ class KafkaConsumerRateControlMixin:
         # Disable retry consumer when first failed batch received
         if self.batch_counter.consecutive_failed_batch_count == 0:
             # Sending notification to controller topic to disable retry consumer
-            self._notify_controller(
-                KafkaConsumerControllerFlagName.retry_consumer_enabled, 0
-            )
+            self._notify_controller(ControllerFlagName.retry_consumer_enabled, 0)
 
         # Increment consecutive failed batch counter and check if it reached exponential backoff threshold
         self.batch_counter.consecutive_failed_batch_count += 1
         if (
             self.batch_counter.consecutive_failed_batch_count
-            < config.CONSUMER_CONTROLLER_CONFIG.throttle_after_failed_batch_threshold
+            < config.CONTROLLER_CONFIG.throttle_after_failed_batch_threshold
         ):
             # Not reached exponential backoff threshold
             return
 
+        # Send system degraded notification to controller
+        self._notify_controller(ControllerFlagName.system_in_degraded_state, 1)
+
         # Slice batch size if required
-        if self._config.batch_size > config.CONSUMER_CONTROLLER_CONFIG.min_batch_size:
+        if self._config.batch_size > config.CONTROLLER_CONFIG.min_batch_size:
             self._config.batch_size = max(
                 round(
                     self._config.batch_size
-                    * (
-                        1
-                        - (
-                            config.CONSUMER_CONTROLLER_CONFIG.batch_size_slice_percentage
-                            / 100
-                        )
-                    )
+                    * (1 - (config.CONTROLLER_CONFIG.batch_size_slice_percentage / 100))
                 ),
-                config.CONSUMER_CONTROLLER_CONFIG.min_batch_size,
+                config.CONTROLLER_CONFIG.min_batch_size,
             )
             LOGGER.info(
                 "msg=%s batch_size=%s", "Sliced batch size", self._config.batch_size
             )
 
         # Check if exponential backoff is enabled
-        if config.CONSUMER_CONTROLLER_CONFIG.exponential_backoff_enabled == 0:
+        if config.CONTROLLER_CONFIG.exponential_backoff_enabled == 0:
             # Not enabled
             return
 
         # Evaluating exponential backoff duration in sec
-        backoff = config.CONSUMER_CONTROLLER_CONFIG.exponential_backoff_initial_delay
-        if self.batch_counter.consecutive_failed_batch_count != 1:
-            coeff = config.CONSUMER_CONTROLLER_CONFIG.exponential_backoff_coefficient
+        backoff = config.CONTROLLER_CONFIG.exponential_backoff_initial_delay
+        if (
+            self.batch_counter.consecutive_failed_batch_count
+            != config.CONTROLLER_CONFIG.throttle_after_failed_batch_threshold
+        ):
+            coeff = config.CONTROLLER_CONFIG.exponential_backoff_coefficient
             backoff = coeff * pow(
                 coeff,
                 self.batch_counter.consecutive_failed_batch_count
-                - config.CONSUMER_CONTROLLER_CONFIG.throttle_after_failed_batch_threshold,
+                - config.CONTROLLER_CONFIG.throttle_after_failed_batch_threshold,
             )
 
-        return min(
-            backoff, config.CONSUMER_CONTROLLER_CONFIG.exponential_backoff_max_delay
-        )
+        return min(backoff, config.CONTROLLER_CONFIG.exponential_backoff_max_delay)
 
     def check_if_system_recovered(self):
         """
@@ -274,7 +276,7 @@ class KafkaConsumerRateControlMixin:
 
         if (
             self.batch_counter.consecutive_success_batch_post_recovery_count
-            < config.CONSUMER_CONTROLLER_CONFIG.reset_throttle_after_success_batch_threshold
+            < config.CONTROLLER_CONFIG.reset_throttle_after_success_batch_threshold
         ):
             # System can't be considered fully recovered yet
             return
@@ -283,9 +285,10 @@ class KafkaConsumerRateControlMixin:
         LOGGER.info("msg=%s", "System considered as recovered")
 
         # Sending notification to controller topic to enable retry consumer
-        self._notify_controller(
-            KafkaConsumerControllerFlagName.retry_consumer_enabled, 1
-        )
+        self._notify_controller(ControllerFlagName.retry_consumer_enabled, 1)
+
+        # Send system recovered notification to controller
+        self._notify_controller(ControllerFlagName.system_in_degraded_state, 0)
 
     def restore_batch_size(self):
         """
@@ -296,18 +299,12 @@ class KafkaConsumerRateControlMixin:
         self._config.batch_size = min(
             round(
                 self._config.batch_size
-                * (
-                    1
-                    + (
-                        config.CONSUMER_CONTROLLER_CONFIG.batch_size_restore_percentage
-                        / 100
-                    )
-                )
+                * (1 + (config.CONTROLLER_CONFIG.batch_size_restore_percentage / 100))
             ),
-            config.CONSUMER_CONTROLLER_CONFIG.batch_size,
+            config.CONTROLLER_CONFIG.batch_size,
         )
         LOGGER.info(
             "msg=%s batch_size=%s", "Restoring batch size", self._config.batch_size
         )
-        if self._config.batch_size == config.CONSUMER_CONTROLLER_CONFIG.batch_size:
+        if self._config.batch_size == config.CONTROLLER_CONFIG.batch_size:
             self.batch_counter.consecutive_success_batch_post_recovery_count = 0

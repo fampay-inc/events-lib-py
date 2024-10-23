@@ -111,7 +111,7 @@ class Command(BaseCommand):
             "topics": topics,
             "retry_topic": retry_topic,
             "dlq_topic": dlq_topic,
-            "batch_size": config.CONSUMER_CONTROLLER_CONFIG.batch_size,
+            "batch_size": config.CONTROLLER_CONFIG.batch_size,
             **config.CONSUMER_CONFIG,
         }
 

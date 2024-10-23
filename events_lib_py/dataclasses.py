@@ -12,7 +12,7 @@ class EventHandlerResponse:
 
 
 @dataclass
-class KafkaConsumerControllerConfig:
+class ControllerConfig:
     _batch_size: "Synchronized[int]" = field(default_factory=lambda: Value("i", 10))
     _batch_failure_event_percentage: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 30)
@@ -105,8 +105,11 @@ class KafkaConsumerControllerConfig:
 
 
 @dataclass
-class KafkaConsumerControllerFlag:
+class ControllerFlag:
     _retry_consumer_enabled: "Synchronized[int]" = field(
+        default_factory=lambda: Value("i", 0)
+    )
+    _system_in_degraded_state: "Synchronized[int]" = field(
         default_factory=lambda: Value("i", 0)
     )
 
@@ -114,6 +117,11 @@ class KafkaConsumerControllerFlag:
     def retry_consumer_enabled(self) -> int:
         with self._retry_consumer_enabled.get_lock():
             return self._retry_consumer_enabled.value
+
+    @property
+    def system_in_degraded_state(self) -> int:
+        with self._system_in_degraded_state.get_lock():
+            return self._system_in_degraded_state.value
 
     def setattr(self, name: str, value: int):
         attr: "Synchronized[int]" = getattr(self, f"_{name}")
