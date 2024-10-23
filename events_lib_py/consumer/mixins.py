@@ -224,7 +224,8 @@ class KafkaConsumerRateControlMixin:
             return
 
         # Send system degraded notification to controller
-        self._notify_controller(ControllerFlagName.system_in_degraded_state, 1)
+        if config.CONTROLLER_FLAG.system_in_degraded_state == 0:
+            self._notify_controller(ControllerFlagName.system_in_degraded_state, 1)
 
         # Slice batch size if required
         if self._config.batch_size > config.CONTROLLER_CONFIG.min_batch_size:
