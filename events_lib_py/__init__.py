@@ -5,7 +5,10 @@ from typing import Any, Callable, Optional
 from confluent_kafka import Message
 
 from .config import IS_TEST_ENV, PRODUCER_CONFIG
-from .consumer import KafkaConsumer, KafkaConsumerConfig
+from .consumer import (
+    KafkaConsumerConfig as ConsumerConfig,
+    MainConsumer as Consumer,
+)
 from .dataclasses import EventHandlerResponse
 from .healthcheck import HealthCheckServer
 from .metrics import (
@@ -16,13 +19,14 @@ from .pb.event_pb2 import Event
 from .producer import FakeKafkaProducer, KafkaProducer, KafkaProducerConfig
 
 __all__ = (
+    "Consumer",
+    "ConsumerConfig",
     "EventHandlerResponse",
     "HealthCheckServer",
-    "KafkaConsumer",
-    "KafkaConsumerConfig",
     "KafkaProducer",
     "KafkaProducerConfig",
     "send_event",
+    "send_raw_message",
 )
 
 
@@ -99,8 +103,8 @@ def send_event(
     )
     default_producer.send_message(
         topic=topic,
-        id=event_id.encode(),
-        message=event.SerializeToString(),
+        key=event_id.encode(),
+        value=event.SerializeToString(),
         queued_callback=generate_queued_callback(
             topic=topic, event_id=event_id, event_name=event.name
         ),
@@ -119,15 +123,37 @@ def send_to_dlq(
     if default_producer is None:
         init_producer()
 
-    id = msg.key()
+    key = msg.key()
     default_producer.send_message(
         topic=dlq_topic,
-        id=id,
-        message=msg.value(),
+        key=key,
+        value=msg.value(),
         queued_callback=generate_queued_callback(
-            topic=dlq_topic, event_id=id.decode(), event_name=event_name
+            topic=dlq_topic, event_id=key.decode(), event_name=event_name
         ),
         sent_callback=generate_sent_callback(
-            topic=dlq_topic, event_id=id.decode(), event_name=event_name
+            topic=dlq_topic, event_id=key.decode(), event_name=event_name
         ),
+    )
+
+
+def send_raw_message(
+    topic: str,
+    key: bytes,
+    value: bytes,
+    headers: Optional[dict] = None,
+    queued_callback: Optional[Callable] = None,
+    sent_callback: Optional[Callable] = None,
+):
+    global default_producer
+    if default_producer is None:
+        init_producer()
+
+    default_producer.send_message(
+        topic=topic,
+        key=key,
+        value=value,
+        headers=headers,
+        queued_callback=queued_callback,
+        sent_callback=sent_callback,
     )

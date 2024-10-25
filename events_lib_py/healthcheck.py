@@ -36,6 +36,7 @@ class HealthCheckUtil:
                 break
 
             if current_committed_offset == current_latest_offset:
+                # Consumer has processed all the events in the partition
                 continue
 
             if current_committed_offset == prev_committed_offset:
