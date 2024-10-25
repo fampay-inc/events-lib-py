@@ -19,7 +19,7 @@ class Controller(BaseKafkaConsumer):
     }
 
     def __init__(
-        self, config, attr_apply_handlers: dict[str, Callable[[int], None]] = {}
+        self, config, attr_apply_handlers: "dict[str, Callable[[int], None]]" = {}
     ):
         super().__init__(config)
         self.attr_apply_handlers = attr_apply_handlers
