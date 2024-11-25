@@ -196,14 +196,8 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     def _check_broker_connection(self):
         LOGGER.info("msg=%s", "Checking broker connection...")
-        member_id = self._consumer.memberid()
-        partitions = self._consumer.assignment()
-        LOGGER.info(
-            "msg=%s member_id=%s partitions=%s",
-            "Connected to broker",
-            member_id,
-            partitions,
-        )
+        self._consumer.list_topics(timeout=5)
+        LOGGER.info("msg=%s", "Connected to broker")
 
     def _subscribe_topic(self):
         def on_assign(consumer: Consumer, partitions: "list[TopicPartition]"):
