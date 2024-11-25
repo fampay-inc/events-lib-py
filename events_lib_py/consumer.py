@@ -183,7 +183,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         self._config = config
         self._consumer = Consumer(config.to_confluent_config())
         self._check_broker_connection()
-        self._consumer.subscribe(config.topics)
+        self._subscribe_topic()
         self._pool = Pool(size=config.batch_size)
         self._keep_running = True
         self._prev_committed_offsets: "dict[tuple, int]" = {}
@@ -196,8 +196,29 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     def _check_broker_connection(self):
         LOGGER.info("msg=%s", "Checking broker connection...")
-        assignment = self._consumer.assignment()
-        LOGGER.info("msg=%s assignment=%s", "Connected to broker", assignment)
+        member_id = self._consumer.memberid()
+        partitions = self._consumer.assignment()
+        LOGGER.info(
+            "msg=%s member_id=%s partitions=%s",
+            "Connected to broker",
+            member_id,
+            partitions,
+        )
+
+    def _subscribe_topic(self):
+        def on_assign(consumer: Consumer, partitions: "list[TopicPartition]"):
+            LOGGER.info(
+                "msg=%s member_id=%s partitions=%s",
+                "Assigned partitions",
+                consumer.memberid(),
+                partitions,
+            )
+            # Resetting previous committed offsets since
+            # another partition can be reassigned to the
+            # consumer.
+            self._prev_committed_offsets = {}
+
+        self._consumer.subscribe(self._config.topics, on_assign=on_assign)
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
