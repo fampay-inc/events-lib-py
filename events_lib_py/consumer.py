@@ -31,7 +31,8 @@ class KafkaConsumerConfig:
 
     bootstrap_servers: str = "127.0.0.1:9092"
     enable_ssl: bool = True
-    auto_commit: bool = False
+    auto_commit: bool = True
+    auto_commit_interval: int = 5000
     auto_offset_reset: str = "earliest"
     session_timeout_in_ms: int = 6000
     batch_size: int = 10
@@ -50,6 +51,7 @@ class KafkaConsumerConfig:
             "bootstrap.servers": self.bootstrap_servers,
             "group.id": self.group_id,
             "enable.auto.commit": self.auto_commit,
+            "auto.commit.interval.ms": self.auto_commit_interval,
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
         }
@@ -181,7 +183,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         self._config = config
         self._consumer = Consumer(config.to_confluent_config())
         self._check_broker_connection()
-        self._consumer.subscribe(config.topics)
+        self._subscribe_topic()
         self._pool = Pool(size=config.batch_size)
         self._keep_running = True
         self._prev_committed_offsets: "dict[tuple, int]" = {}
@@ -194,10 +196,23 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     def _check_broker_connection(self):
         LOGGER.info("msg=%s", "Checking broker connection...")
-        metadata = self._consumer.list_topics(timeout=5)
-        LOGGER.info(
-            "msg=%s topics=%s", "Connected to broker", ", ".join(metadata.topics.keys())
-        )
+        self._consumer.list_topics(timeout=5)
+        LOGGER.info("msg=%s", "Connected to broker")
+
+    def _subscribe_topic(self):
+        def on_assign(consumer: Consumer, partitions: "list[TopicPartition]"):
+            LOGGER.info(
+                "msg=%s member_id=%s partitions=%s",
+                "Assigned partitions",
+                consumer.memberid(),
+                partitions,
+            )
+            # Resetting previous committed offsets since
+            # another partition can be reassigned to the
+            # consumer.
+            self._prev_committed_offsets = {}
+
+        self._consumer.subscribe(self._config.topics, on_assign=on_assign)
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
@@ -225,7 +240,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     @KAFKA_CONSUMER_BATCH_FETCH_LATENCY.time()
     def _fetch_batch(self) -> "list[Message]":
-        return self._consumer.consume(self._config.batch_size, timeout=1)
+        return self._consumer.consume(self._config.batch_size, timeout=0.01)
 
     @KAFKA_CONSUMER_BATCH_PROCESSING_LATENCY.time()
     def _exec_batch(self, batch: "list[Message]"):
@@ -251,8 +266,9 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
             self._pool.map(self.process_message, to_be_processed_messages)
             # Wait for all greenlets to finish
             self._pool.join()
-            # Commit offset in sync after current batch finishes processing
-            self._consumer.commit(asynchronous=False)
+            if not self._config.auto_commit:
+                # Commit offset in sync after current batch finishes processing
+                self._consumer.commit(asynchronous=False)
         except Exception as e:
             LOGGER.error(
                 "msg=%s exc=%s",

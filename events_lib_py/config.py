@@ -9,7 +9,8 @@ DEFAULTS = {
     "CONSUMER_CONFIG": {
         "bootstrap_servers": "127.0.0.1:9092",
         "enable_ssl": False,
-        "auto_commit": False,
+        "auto_commit": True,
+        "auto_commit_interval": 5000,
         "event_handler_map": {},
         "max_retries_per_event_map": {},
         "dlq_pre_send_hook": None,
@@ -44,12 +45,12 @@ def load_consumer_config() -> dict:
 
     config.update(settings.EVENTS_LIB_PY["CONSUMER_CONFIG"])
 
-    importable_props = [
+    importable_props = {
         "event_handler_map",
         "max_retries_per_event_map",
         "dlq_pre_send_hook",
         "generic_exception_handler",
-    ]
+    }
     for prop in importable_props:
         if (path := config.get(prop)) and isinstance(path, str):
             config[prop] = import_from_string(path)
