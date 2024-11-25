@@ -196,8 +196,8 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     def _check_broker_connection(self):
         LOGGER.info("msg=%s", "Checking broker connection...")
-        metadata = self._consumer.consumer_group_metadata()
-        LOGGER.info("msg=%s metadata=%s", "Connected to broker", metadata)
+        assignment = self._consumer.assignment()
+        LOGGER.info("msg=%s assignment=%s", "Connected to broker", assignment)
 
     def _generate_offset_maps(self) -> "tuple[dict, dict]":
         assignments: "list[TopicPartition]" = self._consumer.assignment()
