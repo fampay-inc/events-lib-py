@@ -31,7 +31,8 @@ class KafkaConsumerConfig:
 
     bootstrap_servers: str = "127.0.0.1:9092"
     enable_ssl: bool = True
-    auto_commit: bool = False
+    auto_commit: bool = True
+    auto_commit_interval: int = 5000
     auto_offset_reset: str = "earliest"
     session_timeout_in_ms: int = 6000
     batch_size: int = 10
@@ -50,6 +51,7 @@ class KafkaConsumerConfig:
             "bootstrap.servers": self.bootstrap_servers,
             "group.id": self.group_id,
             "enable.auto.commit": self.auto_commit,
+            "auto.commit.interval.ms": self.auto_commit_interval,
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
         }
@@ -251,8 +253,9 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
             self._pool.map(self.process_message, to_be_processed_messages)
             # Wait for all greenlets to finish
             self._pool.join()
-            # Commit offset in sync after current batch finishes processing
-            self._consumer.commit(asynchronous=False)
+            if not self._config.auto_commit:
+                # Commit offset in sync after current batch finishes processing
+                self._consumer.commit(asynchronous=False)
         except Exception as e:
             LOGGER.error(
                 "msg=%s exc=%s",
