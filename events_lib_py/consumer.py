@@ -240,7 +240,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
 
     @KAFKA_CONSUMER_BATCH_FETCH_LATENCY.time()
     def _fetch_batch(self) -> "list[Message]":
-        return self._consumer.consume(self._config.batch_size, timeout=1)
+        return self._consumer.consume(self._config.batch_size, timeout=0.01)
 
     @KAFKA_CONSUMER_BATCH_PROCESSING_LATENCY.time()
     def _exec_batch(self, batch: "list[Message]"):
