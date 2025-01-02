@@ -5,7 +5,7 @@ from threading import Thread
 from typing import Callable, Optional
 
 from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
-from gevent.pool import Pool
+from multiprocessing.pool import Pool
 
 from events_lib_py.healthcheck import HealthCheckUtil
 
@@ -184,7 +184,7 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         self._consumer = Consumer(config.to_confluent_config())
         self._check_broker_connection()
         self._subscribe_topic()
-        self._pool = Pool(size=config.batch_size)
+        self._pool = Pool(processes=config.batch_size)
         self._keep_running = True
         self._prev_committed_offsets: "dict[tuple, int]" = {}
 
@@ -264,8 +264,6 @@ class KafkaConsumer(_KafkaConsumerHandlerMixin, Thread):
         try:
             # Process batch using greenlet-based cooperative multitasking
             self._pool.map(self.process_message, to_be_processed_messages)
-            # Wait for all greenlets to finish
-            self._pool.join()
             if not self._config.auto_commit:
                 # Commit offset in sync after current batch finishes processing
                 self._consumer.commit(asynchronous=False)
