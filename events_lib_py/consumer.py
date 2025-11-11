@@ -28,7 +28,7 @@ class KafkaConsumerConfig:
     dlq_topic: str
     event_handler_map: "dict[str, Callable[[str, bytes], EventHandlerResponse]]"
     max_retries_per_event_map: "dict[str, int]"
-    topic_event_name_map: Optional[dict[str, str]] = None
+    skip_unmarshal_topics_event_name_map: Optional[dict[str, str]] = None
 
 
     bootstrap_servers: str = "127.0.0.1:9092"
@@ -123,26 +123,20 @@ class _KafkaConsumerHandlerMixin:
         key = msg.key().decode()
         topic = msg.topic()
         LOGGER.info("msg=%s key=%s", "Processing message", key)
-
+        
         try:
-            event: Event = Event.FromString(msg.value())
-        except Exception as e:
-            if self._config.topic_event_name_map and topic in self._config.topic_event_name_map:
-                event_name = self._config.topic_event_name_map[topic]
-                LOGGER.info(
-                    "msg=%s topic=%s event_name=%s",
-                    "Wrapping raw payload into Event using mapping",
-                    topic,
-                    event_name,
-                )
+            if self._config.skip_unmarshal_topics_event_name_map and topic in self._config.skip_unmarshal_topics_event_name_map:
+                event_name = self._config.skip_unmarshal_topics_event_name_map[topic]
                 event = Event(name=event_name, payload=msg.value(), retry_count=0)
-            else:
-                self._handle_dlq(
-                    msg=msg,
-                    err_msg=f"Unable to parse event and no mapping found for topic {topic}",
-                    exc=e,
-                )
-                return
+            else: 
+                event: Event = Event.FromString(msg.value())
+        except Exception as e:
+            self._handle_dlq(
+                msg=msg,
+                err_msg=f"Unable to parse event and no mapping found for topic {topic}",
+                exc=e,
+            )
+            return
 
         handler = self._config.event_handler_map.get(event.name)
         if handler is None:
