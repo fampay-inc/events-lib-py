@@ -133,15 +133,14 @@ class _KafkaConsumerHandlerMixin:
                     topic,
                     event_name,
                 )
-                retry_count = self._config.max_retries_per_event_map.get(event_name, 0)
-                event = Event(name=event_name, payload=msg.value(), retry_count=retry_count)
+                event = Event(name=event_name, payload=msg.value(), retry_count=0)
             else:
                 self._handle_dlq(
                     msg=msg,
                     err_msg=f"Unable to parse event and no mapping found for topic {topic}",
                     exc=e,
                 )
-            return
+                return
 
         handler = self._config.event_handler_map.get(event.name)
         if handler is None:
