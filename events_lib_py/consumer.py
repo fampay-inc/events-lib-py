@@ -28,6 +28,8 @@ class KafkaConsumerConfig:
     dlq_topic: str
     event_handler_map: "dict[str, Callable[[str, bytes], EventHandlerResponse]]"
     max_retries_per_event_map: "dict[str, int]"
+    topic_event_name_map: Optional[dict[str, str]] = None
+
 
     bootstrap_servers: str = "127.0.0.1:9092"
     enable_ssl: bool = True
@@ -117,16 +119,28 @@ class _KafkaConsumerHandlerMixin:
             If dlq, pushes event to DLQ topic
         """
         key = msg.key().decode()
+        topic = msg.topic()
         LOGGER.info("msg=%s key=%s", "Processing message", key)
 
         try:
             event: Event = Event.FromString(msg.value())
         except Exception as e:
-            self._handle_dlq(
-                msg=msg,
-                err_msg="Unable to parse event",
-                exc=e,
-            )
+            if self._config.topic_event_name_map and topic in self._config.topic_event_name_map:
+                event_name = self._config.topic_event_name_map[topic]
+                LOGGER.info(
+                    "msg=%s topic=%s event_name=%s",
+                    "Wrapping raw payload into Event using mapping",
+                    topic,
+                    event_name,
+                )
+                retry_count = self._config.max_retries_per_event_map.get(event_name, 0)
+                event = Event(name=event_name, payload=msg.value(), retry_count=retry_count)
+            else:
+                self._handle_dlq(
+                    msg=msg,
+                    err_msg=f"Unable to parse event and no mapping found for topic {topic}",
+                    exc=e,
+                )
             return
 
         handler = self._config.event_handler_map.get(event.name)
@@ -154,7 +168,7 @@ class _KafkaConsumerHandlerMixin:
                     )
                     return
                 else:
-                    self._handle_retry(event=event)
+                    self._handle_retry(msg=msg,event=event)
                     return
 
             if response.dlq:
