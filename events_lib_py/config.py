@@ -15,6 +15,7 @@ DEFAULTS = {
         "max_retries_per_event_map": {},
         "dlq_pre_send_hook": None,
         "generic_exception_handler": None,
+        "skip_unmarshal_topics_event_name_map": {},
     },
     "PRODUCER_CONFIG": {
         "bootstrap_servers": "127.0.0.1:9092",
@@ -50,6 +51,7 @@ def load_consumer_config() -> dict:
         "max_retries_per_event_map",
         "dlq_pre_send_hook",
         "generic_exception_handler",
+        "skip_unmarshal_topics_event_name_map",
     }
     for prop in importable_props:
         if (path := config.get(prop)) and isinstance(path, str):
