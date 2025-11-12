@@ -123,20 +123,20 @@ class _KafkaConsumerHandlerMixin:
         key = msg.key().decode()
         topic = msg.topic()
         LOGGER.info("msg=%s key=%s", "Processing message", key)
-        
-        try:
-            if self._config.skip_unmarshal_topics_event_name_map and topic in self._config.skip_unmarshal_topics_event_name_map:
-                event_name = self._config.skip_unmarshal_topics_event_name_map[topic]
-                event = Event(name=event_name, payload=msg.value(), retry_count=0)
-            else: 
+
+        if self._config.skip_unmarshal_topics_event_name_map and topic in self._config.skip_unmarshal_topics_event_name_map:
+            event_name = self._config.skip_unmarshal_topics_event_name_map[topic]
+            event = Event(name=event_name, payload=msg.value(), retry_count=0)
+        else:
+            try:
                 event: Event = Event.FromString(msg.value())
-        except Exception as e:
-            self._handle_dlq(
-                msg=msg,
-                err_msg=f"Unable to parse event and no mapping found for topic {topic}",
-                exc=e,
-            )
-            return
+            except Exception as e:
+                self._handle_dlq(
+                    msg=msg,
+                    err_msg=f"Unable to parse event and no mapping found for topic {topic}",
+                    exc=e,
+                )
+                return
 
         handler = self._config.event_handler_map.get(event.name)
         if handler is None:
