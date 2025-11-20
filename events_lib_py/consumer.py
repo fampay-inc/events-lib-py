@@ -8,6 +8,7 @@ from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
 from events_lib_py.healthcheck import HealthCheckUtil
+from .auth import AuthProvider, build_confluent_auth_config
 
 from .dataclasses import EventHandlerResponse
 from .metrics import (
@@ -40,13 +41,14 @@ class KafkaConsumerConfig:
         Callable[[Message, Optional[str], Optional[str], Optional[Exception]], None]
     ] = None
     generic_exception_handler: Optional[Callable[[Exception], None]] = None
+    auth_provider: Optional[AuthProvider] = None
 
     def __post_init__(self):
         if not self.generic_exception_handler:
             self.generic_exception_handler = lambda _: ...
 
     def to_confluent_config(self) -> dict:
-        return {
+        confluent_config = {
             "security.protocol": "SSL" if self.enable_ssl else "PLAINTEXT",
             "bootstrap.servers": self.bootstrap_servers,
             "group.id": self.group_id,
@@ -54,7 +56,21 @@ class KafkaConsumerConfig:
             "auto.commit.interval.ms": self.auto_commit_interval,
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
-        }
+         }
+
+        if self.auth_provider is None:
+            return  confluent_config
+
+        mechanism = self.auth_provider.get_mechanism()
+        auth_option = self.auth_provider.get_auth_options()
+
+        if mechanism is not None or auth_option is not None:
+            return confluent_config
+
+        confluent_config.update(build_confluent_auth_config(auth_provider=self.auth_provider))
+
+        return confluent_config
+
 
 
 class _KafkaConsumerHandlerMixin:
