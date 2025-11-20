@@ -8,8 +8,7 @@ from typing import Callable, Optional
 
 from confluent_kafka import Producer
 
-from events_lib_py import AuthOptions
-from events_lib_py.auth import build_confluent_auth_config
+from .auth import AuthOptions, build_confluent_auth_config
 
 LOGGER = logging.getLogger(__name__)
 
