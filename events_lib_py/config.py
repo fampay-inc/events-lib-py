@@ -22,7 +22,7 @@ DEFAULTS = {
         "bootstrap_servers": "127.0.0.1:9092",
         "enable_ssl": False,
     },
-    "AUTH_OPTION" : None,
+    "auth_option" : None,
     "HEALTHCHECK_PORT": 9101,
 }
 
@@ -59,7 +59,7 @@ def load_consumer_config() -> dict:
         if (path := config.get(prop)) and isinstance(path, str):
             config[prop] = import_from_string(path)
 
-    config["AUTH_OPTION"] = coerce_to_provider(config.get("AUTH_OPTION"), import_from_string)
+    config["auth_option"] = coerce_to_provider(config.get("auth_option"), import_from_string)
 
     return config
 
@@ -71,7 +71,7 @@ def load_producer_config() -> dict:
 
     config.update(settings.EVENTS_LIB_PY["PRODUCER_CONFIG"])
 
-    config["auth_provider"] = coerce_to_provider(config.get("auth_provider"), import_from_string)
+    config["auth_option"] = coerce_to_provider(config.get("auth_option"), import_from_string)
     return config
 
 

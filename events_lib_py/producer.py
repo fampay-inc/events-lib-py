@@ -24,7 +24,7 @@ class KafkaProducerConfig:
     block_timeout = 10_000  # in ms
     ack_event_timeout = 10_000  # in ms
     max_buffer_memory = 32 * 1024 * 1024  # size in bytes
-    auth_options: Optional[AuthOptions] = None
+    auth_option: Optional[AuthOptions] = None
 
     def to_confluent_config(self) -> dict:
         confluent_config = {
