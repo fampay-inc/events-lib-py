@@ -17,12 +17,12 @@ DEFAULTS = {
         "dlq_pre_send_hook": None,
         "generic_exception_handler": None,
         "skip_unmarshal_topics_event_name_map": {},
-        "auth_provider" : None,
     },
     "PRODUCER_CONFIG": {
         "bootstrap_servers": "127.0.0.1:9092",
         "enable_ssl": False,
     },
+    "AUTH_OPTION" : None,
     "HEALTHCHECK_PORT": 9101,
 }
 
@@ -59,7 +59,7 @@ def load_consumer_config() -> dict:
         if (path := config.get(prop)) and isinstance(path, str):
             config[prop] = import_from_string(path)
 
-    config["auth_provider"] = coerce_to_provider(config.get("auth_provider"), import_from_string)
+    config["AUTH_OPTION"] = coerce_to_provider(config.get("AUTH_OPTION"), import_from_string)
 
     return config
 

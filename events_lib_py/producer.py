@@ -8,7 +8,8 @@ from typing import Callable, Optional
 
 from confluent_kafka import Producer
 
-from events_lib_py.auth import build_confluent_auth_config, AuthProvider
+from events_lib_py import AuthOptions
+from events_lib_py.auth import build_confluent_auth_config
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class KafkaProducerConfig:
     block_timeout = 10_000  # in ms
     ack_event_timeout = 10_000  # in ms
     max_buffer_memory = 32 * 1024 * 1024  # size in bytes
-    auth_provider: Optional[AuthProvider] = None
+    auth_options: Optional[AuthOptions] = None
 
     def to_confluent_config(self) -> dict:
         confluent_config = {
@@ -38,7 +39,7 @@ class KafkaProducerConfig:
             "delivery.timeout.ms": self.ack_event_timeout,
         }
 
-        confluent_config.update(build_confluent_auth_config(auth_provider=self.auth_provider))
+        confluent_config.update(build_confluent_auth_config(self.auth_options))
 
         return confluent_config
 

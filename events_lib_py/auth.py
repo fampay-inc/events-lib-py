@@ -32,158 +32,113 @@ class AuthOptions:
     mechanism: Optional[AuthMechanism] = None
 
 
-# --- Provider protocol ---
-class AuthProvider(Protocol):
-    def get_mechanism(self) -> AuthMechanism:
-        ...
-
-    def get_auth_options(self) -> AuthOptions:
-        ...
-
-
-# --- Base Provider ---
-class BaseAuthProvider:
-    def __init__(self, mechanism: AuthMechanism, options: Optional[AuthOptions] = None):
-        self._mech = mechanism
-        self._opts = options or AuthOptions(mechanism=mechanism)
-
-    def get_mechanism(self) -> AuthMechanism:
-        return self._mech
-
-    def get_auth_options(self) -> AuthOptions:
-        return self._opts
-
-
-# --- Factory helpers ---
-def new_no_auth() -> AuthProvider:
-    return BaseAuthProvider(AuthMechanism.NONE, AuthOptions(mechanism=AuthMechanism.NONE))
-
-
-def new_plain_auth(username: str, password: str, use_tls: bool = True) -> AuthProvider:
-    return BaseAuthProvider(AuthMechanism.PLAIN, AuthOptions(
-        username=username,
-        password=password,
-        use_tls=use_tls,
-        mechanism=AuthMechanism.PLAIN,
-    ))
-
-
-def new_scram_auth(
-        username: str,
-        password: str,
-        mech: AuthMechanism = AuthMechanism.SCRAM_SHA_256,
-        use_tls: bool = True,
-) -> AuthProvider:
-    if mech not in (AuthMechanism.SCRAM_SHA_256, AuthMechanism.SCRAM_SHA_512):
-        raise ValueError("Invalid SCRAM mechanism")
-
-    return BaseAuthProvider(mech, AuthOptions(
-        username=username,
-        password=password,
-        use_tls=use_tls,
-        mechanism=mech,
-    ))
-
-
-def new_tls_auth(
-        ca_location: Optional[str] = None,
-        certfile: Optional[str] = None,
-        keyfile: Optional[str] = None,
-        key_password: Optional[str] = None,
-        ssl_context: Optional[ssl.SSLContext] = None,
-) -> AuthProvider:
-    ctx = ssl_context
-    if ctx is None:
-        ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
-        if ca_location:
-            ctx.load_verify_locations(cafile=ca_location)
-        if certfile and keyfile:
-            ctx.load_cert_chain(certfile=certfile, keyfile=keyfile, password=key_password)
-
-    return BaseAuthProvider(AuthMechanism.TLS, AuthOptions(
-        use_tls=True,
-        ssl_ca_location=ca_location,
-        ssl_certfile=certfile,
-        ssl_keyfile=keyfile,
-        ssl_key_password=key_password,
-        ssl_context=ctx,
-        mechanism=AuthMechanism.TLS,
-    ))
-
 
 # --- Coercion helper ---
-def coerce_to_provider(maybe: Any, import_from_string: Callable[[str], Any]) -> AuthProvider:
+def coerce_to_provider(maybe: Any, import_from_string: Callable[[str], Any]) -> AuthOptions:
     """
     Accept:
-      - AuthProvider instance
+      - AuthOptions instance
       - dict config
-      - import path string
-      - None → new_no_auth()
+      - import path string (use import_from_string to load)
+      - provider-like object with attributes
+      - None -> new no-auth AuthOptions (mechanism=NONE)
+
+    Returns:
+      AuthOptions
     """
+    # 1) Already an AuthOptions
+    if isinstance(maybe, AuthOptions):
+        return maybe
+
+    # 2) None -> no auth
     if maybe is None:
-        return new_no_auth()
+        return AuthOptions(mechanism=AuthMechanism.NONE)
 
-    if hasattr(maybe, "get_mechanism") and hasattr(maybe, "get_auth_options"):
-        return maybe  # Already a provider
-
+    # 3) If a string -> import it and re-coerce the result
     if isinstance(maybe, str):
-        obj = import_from_string(maybe)
-        return coerce_to_provider(obj, import_from_string)
+        loaded = import_from_string(maybe)
+        # recursively coerce the loaded object (avoid infinite recursion by ensuring loaded != same string)
+        return coerce_to_provider(loaded, import_from_string)
 
+    # 4) If dict -> map keys to AuthOptions fields
     if isinstance(maybe, dict):
-        mech = maybe.get("sasl_mechanism") or maybe.get("mechanism")
-
-        # Normalize mechanism
-        if isinstance(mech, str):
-            mech_upper = mech.upper()
-            if mech_upper == "PLAIN":
-                mechanism = AuthMechanism.PLAIN
-            elif "SCRAM" in mech_upper:
-                if "512" in mech_upper:
-                    mechanism = AuthMechanism.SCRAM_SHA_512
-                else:
-                    mechanism = AuthMechanism.SCRAM_SHA_256
-            elif mech_upper in ("TLS", "MTLS"):
-                mechanism = AuthMechanism.TLS
-            elif mech_upper in ("AWS_MSK_IAM", "AWSMSKIAM", "AWS_IAM"):
-                mechanism = AuthMechanism.AWS_MSK_IAM
+        d = maybe.copy()
+        mech = d.get("mechanism")
+        if mech is not None:
+            # Allow either AuthMechanism or string
+            if isinstance(mech, AuthMechanism):
+                mech_enum = mech
             else:
-                mechanism = AuthMechanism.NONE
-        elif isinstance(mech, AuthMechanism):
-            mechanism = mech
+                # accept values like "plain", "PLAIN", "SCRAM-SHA-256", "tls", etc.
+                try:
+                    mech_enum = AuthMechanism(mech)
+                except Exception:
+                    # try uppercase fallback for simple strings like "plain" or "tls"
+                    try:
+                        mech_enum = AuthMechanism(str(mech).upper())
+                    except Exception:
+                        raise ValueError(f"Unknown mechanism value: {mech!r}")
         else:
-            mechanism = AuthMechanism.NONE
+            mech_enum = None
 
-        # Build options from dict
-        opts = AuthOptions(
-            username=maybe.get("sasl_username") or maybe.get("username"),
-            password=maybe.get("sasl_password") or maybe.get("password"),
-            use_tls=maybe.get("enable_ssl") or maybe.get("use_tls") or False,
-            ssl_ca_location=maybe.get("ssl_ca_location"),
-            ssl_certfile=maybe.get("ssl_certificate_location") or maybe.get("ssl_certfile"),
-            ssl_keyfile=maybe.get("ssl_key_location") or maybe.get("ssl_keyfile"),
-            ssl_key_password=maybe.get("ssl_key_password"),
-            mechanism=mechanism,
+        return AuthOptions(
+            username=d.get("username"),
+            password=d.get("password"),
+            use_tls=bool(d.get("use_tls", False)),
+            ssl_ca_location=d.get("ssl_ca_location") or d.get("ssl.ca.location"),
+            ssl_certfile=d.get("ssl_certfile") or d.get("ssl.certificate.location"),
+            ssl_keyfile=d.get("ssl_keyfile") or d.get("ssl.key.location"),
+            ssl_key_password=d.get("ssl_key_password") or d.get("ssl.key.password"),
+            ssl_context=d.get("ssl_context"),
+            mechanism=mech_enum,
         )
 
-        # Return provider based on mechanism
-        if mechanism == AuthMechanism.PLAIN:
-            return new_plain_auth(opts.username or "", opts.password or "", opts.use_tls)
+    # 5) If it's an object (e.g. provider instance) try to extract expected attributes
+    # This supports e.g. an AuthProvider instance that exposes similar-named attrs or a method returning options
+    if hasattr(maybe, "__dict__") or not isinstance(maybe, (int, float, bool, bytes, bytearray)):
+        # If provider exposes a method to get options, prefer that (common names)
+        for getter_name in ("to_auth_options", "get_auth_options", "auth_options", "as_auth_options"):
+            getter = getattr(maybe, getter_name, None)
+            if callable(getter):
+                result = getter()
+                # If method returns dict or AuthOptions, coerce recursively
+                return coerce_to_provider(result, import_from_string)
 
-        if mechanism in (AuthMechanism.SCRAM_SHA_256, AuthMechanism.SCRAM_SHA_512):
-            return new_scram_auth(opts.username or "", opts.password or "", mechanism, opts.use_tls)
+        # Fall back to reading attributes by name
+        username = getattr(maybe, "username", None)
+        password = getattr(maybe, "password", None)
+        use_tls = getattr(maybe, "use_tls", getattr(maybe, "useTls", False))
+        ssl_ca_location = getattr(maybe, "ssl_ca_location", getattr(maybe, "ssl_ca", None))
+        ssl_certfile = getattr(maybe, "ssl_certfile", getattr(maybe, "ssl_certfile_path", None))
+        ssl_keyfile = getattr(maybe, "ssl_keyfile", getattr(maybe, "ssl_keyfile_path", None))
+        ssl_key_password = getattr(maybe, "ssl_key_password", None)
+        ssl_context = getattr(maybe, "ssl_context", None)
+        mech = getattr(maybe, "mechanism", None)
+        if mech is not None and not isinstance(mech, AuthMechanism):
+            try:
+                mech = AuthMechanism(mech)
+            except Exception:
+                try:
+                    mech = AuthMechanism(str(mech).upper())
+                except Exception:
+                    raise ValueError(f"Unknown mechanism value on provider object: {mech!r}")
 
-        if mechanism == AuthMechanism.TLS:
-            return new_tls_auth(
-                opts.ssl_ca_location,
-                opts.ssl_certfile,
-                opts.ssl_keyfile,
-                opts.ssl_key_password,
+        # If any of the above attributes exist, return an AuthOptions built from them
+        if any([username, password, use_tls, ssl_ca_location, ssl_certfile, ssl_keyfile, ssl_context, mech]):
+            return AuthOptions(
+                username=username,
+                password=password,
+                use_tls=bool(use_tls),
+                ssl_ca_location=ssl_ca_location,
+                ssl_certfile=ssl_certfile,
+                ssl_keyfile=ssl_keyfile,
+                ssl_key_password=ssl_key_password,
+                ssl_context=ssl_context,
+                mechanism=mech,
             )
 
-        return new_no_auth()
-
-    raise TypeError("Unsupported auth specification")
+    # Not something we can coerce
+    raise TypeError("Unsupported auth provider type; expected AuthOptions, dict, import path string, provider object, or None")
 
 def _add_tls_keys(conf: Dict[str, Any], opts: AuthOptions) -> None:
     """
@@ -230,7 +185,7 @@ def _build_sasl_conf(mech_value: str, opts: AuthOptions) -> Dict[str, Any]:
     return conf
 
 
-def build_confluent_auth_config(auth_provider: AuthProvider) -> Dict[str, Any]:
+def build_confluent_auth_config(opts: AuthOptions) -> Dict[str, Any]:
     """
     Convert an AuthProvider to a confluent-kafka / librdkafka configuration dict.
 
@@ -238,15 +193,13 @@ def build_confluent_auth_config(auth_provider: AuthProvider) -> Dict[str, Any]:
     ssl.*) that you can `update()` into the final confluent-kafka client config.
 
     """
-    if auth_provider is None:
+    if opts is None:
         return {}
 
-    mech = auth_provider.get_mechanism()
-    opts = auth_provider.get_auth_options()
-
+    mech = opts.mechanism
     conf: Dict[str, Any] = {}
 
-    if mech is None or mech is None:
+    if mech is None:
         return conf
 
     # NONE
