@@ -8,8 +8,7 @@ from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
 from events_lib_py.healthcheck import HealthCheckUtil
-from . import AuthOptions
-from .auth import build_confluent_auth_config
+from .auth import AuthOptions, build_confluent_auth_config
 
 from .dataclasses import EventHandlerResponse
 from .metrics import (
