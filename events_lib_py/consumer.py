@@ -28,7 +28,7 @@ class KafkaConsumerConfig:
     dlq_topic: str
     event_handler_map: "dict[str, Callable[[str, bytes], EventHandlerResponse]]"
     max_retries_per_event_map: "dict[str, int]"
-    skip_unmarshal_topics_event_name_map: Optional[dict[str, str]] = None
+    skip_unmarshal_topics_event_name_map: "Optional[dict[str, str]]" = None
 
 
     bootstrap_servers: str = "127.0.0.1:9092"
