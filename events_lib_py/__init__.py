@@ -14,6 +14,7 @@ from .metrics import (
 )
 from .pb.event_pb2 import Event
 from .producer import FakeKafkaProducer, KafkaProducer, KafkaProducerConfig
+from auth import AuthOptions, AuthMechanism, AuthProvider
 
 __all__ = (
     "EventHandlerResponse",
@@ -23,6 +24,9 @@ __all__ = (
     "KafkaProducer",
     "KafkaProducerConfig",
     "send_event",
+    "AuthOptions",
+    "AuthMechanism",
+    "AuthProvider"
 )
 
 
