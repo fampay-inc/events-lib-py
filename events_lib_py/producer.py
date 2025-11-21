@@ -40,6 +40,8 @@ class KafkaProducerConfig:
 
         confluent_config.update(build_confluent_auth_config(self.auth_option))
 
+        print("producer config", confluent_config)
+
         return confluent_config
 
 
