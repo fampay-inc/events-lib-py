@@ -216,8 +216,8 @@ def build_confluent_auth_config(opts: AuthOptions) -> Dict[str, Any]:
     # SCRAM-SHA-256 / SCRAM-SHA-512
     if mech in (AuthMechanism.SCRAM_SHA_256, AuthMechanism.SCRAM_SHA_512):
         if not (opts.username and opts.password):
-            raise ValueError(f"{mech.value()} requires username and password")
-        conf.update(_build_sasl_conf(mech.value(), opts))
+            raise ValueError(f"{mech.value} requires username and password")
+        conf.update(_build_sasl_conf(mech.value, opts))
         return conf
 
     # TLS-only (mTLS)
