@@ -38,7 +38,7 @@ class KafkaProducerConfig:
             "delivery.timeout.ms": self.ack_event_timeout,
         }
 
-        confluent_config.update(build_confluent_auth_config(self.auth_options))
+        confluent_config.update(build_confluent_auth_config(self.auth_option))
 
         return confluent_config
 

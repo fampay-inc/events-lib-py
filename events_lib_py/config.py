@@ -17,12 +17,13 @@ DEFAULTS = {
         "dlq_pre_send_hook": None,
         "generic_exception_handler": None,
         "skip_unmarshal_topics_event_name_map": {},
+        "auth_option": None,
     },
     "PRODUCER_CONFIG": {
         "bootstrap_servers": "127.0.0.1:9092",
         "enable_ssl": False,
+        "auth_option": None,
     },
-    "auth_option" : None,
     "HEALTHCHECK_PORT": 9101,
 }
 
