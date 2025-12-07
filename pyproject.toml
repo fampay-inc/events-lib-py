@@ -9,7 +9,7 @@ readme = "README.md"
 python = "^3.8"
 Django = "*"
 confluent-kafka = "==2.3.0"
-gevent = "^24.2.1"
+gevent = ">=24.2.1"
 prometheus-client = ">=0.7"
 
 [tool.poetry.dev-dependencies]
