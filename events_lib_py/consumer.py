@@ -36,7 +36,7 @@ class KafkaConsumerConfig:
     enable_ssl: bool = True
     auto_commit: bool = True
     auto_commit_interval: int = 5000
-    auto_offset_reset: str = "earliest"
+    auto_offset_reset: str = "latest"
     session_timeout_in_ms: int = 6000
     batch_size: int = 10
     dlq_pre_send_hook: Optional[
