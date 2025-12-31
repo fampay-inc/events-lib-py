@@ -15,6 +15,8 @@ from .metrics import (
     KAFKA_CONSUMER_BATCH_FETCH_LATENCY,
     KAFKA_CONSUMER_BATCH_PROCESSING_LATENCY,
     KAFKA_MESSAGE_SENT_TO_DLQ_TOTAL,
+    KAFKA_MESSAGE_PROCESSED_TOTAL,
+    KAFKA_CONSUMER_MESSAGE_PROCESSING_LATENCY,
 )
 from .pb.event_pb2 import Event
 
@@ -155,8 +157,14 @@ class _KafkaConsumerHandlerMixin:
             return
 
         try:
-            response = handler(key, event.payload)
+            with KAFKA_CONSUMER_MESSAGE_PROCESSING_LATENCY.labels(
+                topic=topic, event_name=event.name
+            ).time():
+                response = handler(key, event.payload)
             if response.success:
+                KAFKA_MESSAGE_PROCESSED_TOTAL.labels(
+                    topic=topic, event_name=event.name
+                ).inc()
                 LOGGER.info("msg=%s key=%s", "Processed message successfully", key)
                 return
 
