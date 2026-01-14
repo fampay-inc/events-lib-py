@@ -26,3 +26,15 @@ KAFKA_CONSUMER_BATCH_PROCESSING_LATENCY = Histogram(
     name="kafka_consumer_batch_processing_latency",
     documentation="Kafka consumer batch processing latency (s)",
 )
+
+KAFKA_CONSUMER_MESSAGE_PROCESSING_LATENCY = Histogram(
+    name="kafka_consumer_message_processing_latency",
+    documentation="Kafka consumer individual message processing latency (s)",
+    labelnames=["topic", "event_name"],
+)
+
+KAFKA_MESSAGE_PROCESSED_TOTAL = Counter(
+    name="kafka_message_processed_total",
+    documentation="Total Kafka messages processed",
+    labelnames=["topic", "event_name"],
+)

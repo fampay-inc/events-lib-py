@@ -8,6 +8,8 @@ from typing import Callable, Optional
 
 from confluent_kafka import Producer
 
+from .auth import AuthOptions, build_confluent_auth_config
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -22,9 +24,10 @@ class KafkaProducerConfig:
     block_timeout = 10_000  # in ms
     ack_event_timeout = 10_000  # in ms
     max_buffer_memory = 32 * 1024 * 1024  # size in bytes
+    auth_option: Optional[AuthOptions] = None
 
     def to_confluent_config(self) -> dict:
-        return {
+        confluent_config = {
             "security.protocol": "SSL" if self.enable_ssl else "PLAINTEXT",
             "bootstrap.servers": self.bootstrap_servers,
             "acks": self.acks,
@@ -34,6 +37,12 @@ class KafkaProducerConfig:
             "request.timeout.ms": self.block_timeout,
             "delivery.timeout.ms": self.ack_event_timeout,
         }
+
+        confluent_config.update(build_confluent_auth_config(self.auth_option))
+
+        print("producer config", confluent_config)
+
+        return confluent_config
 
 
 class DeliveryReportConsumer(Thread):

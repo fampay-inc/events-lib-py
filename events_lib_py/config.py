@@ -2,6 +2,7 @@ from typing import Any, Callable, Optional
 from django.conf import settings
 from django.utils.module_loading import import_string
 
+from events_lib_py.auth import coerce_to_provider
 
 DEFAULTS = {
     "IS_TEST_ENV": False,
@@ -16,10 +17,12 @@ DEFAULTS = {
         "dlq_pre_send_hook": None,
         "generic_exception_handler": None,
         "skip_unmarshal_topics_event_name_map": {},
+        "auth_option": None,
     },
     "PRODUCER_CONFIG": {
         "bootstrap_servers": "127.0.0.1:9092",
         "enable_ssl": False,
+        "auth_option": None,
     },
     "HEALTHCHECK_PORT": 9101,
 }
@@ -57,6 +60,8 @@ def load_consumer_config() -> dict:
         if (path := config.get(prop)) and isinstance(path, str):
             config[prop] = import_from_string(path)
 
+    config["auth_option"] = coerce_to_provider(config.get("auth_option"), import_from_string)
+
     return config
 
 
@@ -67,6 +72,7 @@ def load_producer_config() -> dict:
 
     config.update(settings.EVENTS_LIB_PY["PRODUCER_CONFIG"])
 
+    config["auth_option"] = coerce_to_provider(config.get("auth_option"), import_from_string)
     return config
 
 

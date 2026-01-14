@@ -8,12 +8,15 @@ from confluent_kafka import Consumer, KafkaError, Message, TopicPartition
 from gevent.pool import Pool
 
 from events_lib_py.healthcheck import HealthCheckUtil
+from .auth import AuthOptions, build_confluent_auth_config
 
 from .dataclasses import EventHandlerResponse
 from .metrics import (
     KAFKA_CONSUMER_BATCH_FETCH_LATENCY,
     KAFKA_CONSUMER_BATCH_PROCESSING_LATENCY,
     KAFKA_MESSAGE_SENT_TO_DLQ_TOTAL,
+    KAFKA_MESSAGE_PROCESSED_TOTAL,
+    KAFKA_CONSUMER_MESSAGE_PROCESSING_LATENCY,
 )
 from .pb.event_pb2 import Event
 
@@ -28,7 +31,7 @@ class KafkaConsumerConfig:
     dlq_topic: str
     event_handler_map: "dict[str, Callable[[str, bytes], EventHandlerResponse]]"
     max_retries_per_event_map: "dict[str, int]"
-    skip_unmarshal_topics_event_name_map: Optional[dict[str, str]] = None
+    skip_unmarshal_topics_event_name_map: "Optional[dict[str, str]]" = None
 
 
     bootstrap_servers: str = "127.0.0.1:9092"
@@ -42,13 +45,14 @@ class KafkaConsumerConfig:
         Callable[[Message, Optional[str], Optional[str], Optional[Exception]], None]
     ] = None
     generic_exception_handler: Optional[Callable[[Exception], None]] = None
+    auth_option: Optional[AuthOptions] = None
 
     def __post_init__(self):
         if not self.generic_exception_handler:
             self.generic_exception_handler = lambda _: ...
 
     def to_confluent_config(self) -> dict:
-        return {
+        confluent_config = {
             "security.protocol": "SSL" if self.enable_ssl else "PLAINTEXT",
             "bootstrap.servers": self.bootstrap_servers,
             "group.id": self.group_id,
@@ -56,7 +60,12 @@ class KafkaConsumerConfig:
             "auto.commit.interval.ms": self.auto_commit_interval,
             "auto.offset.reset": self.auto_offset_reset,
             "session.timeout.ms": self.session_timeout_in_ms,
-        }
+         }
+
+        confluent_config.update(build_confluent_auth_config(self.auth_option))
+
+        return confluent_config
+
 
 
 class _KafkaConsumerHandlerMixin:
@@ -148,8 +157,14 @@ class _KafkaConsumerHandlerMixin:
             return
 
         try:
-            response = handler(key, event.payload)
+            with KAFKA_CONSUMER_MESSAGE_PROCESSING_LATENCY.labels(
+                topic=topic, event_name=event.name
+            ).time():
+                response = handler(key, event.payload)
             if response.success:
+                KAFKA_MESSAGE_PROCESSED_TOTAL.labels(
+                    topic=topic, event_name=event.name
+                ).inc()
                 LOGGER.info("msg=%s key=%s", "Processed message successfully", key)
                 return
 
